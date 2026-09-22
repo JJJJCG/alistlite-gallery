@@ -35,9 +35,10 @@ var LS_PATH = 'alistlite.path';
 var LS_KIND = 'alistlite.kind';
 var LS_SORT = 'alistlite.sort';
 var LS_ROW = 'alistlite.row';
+var LS_DEPTH = 'alistlite.depth';
 
-var SCAN_MAX_DIRS = 5000;
-var SCAN_CONCURRENCY = 5;
+var SCAN_MAX_DIRS = 4000;     // 兜底上限，防止范围设错时无限扫下去
+var SCAN_CONCURRENCY = 5;     // 同时请求的目录数
 
 var state = {
   token: '',
@@ -45,6 +46,9 @@ var state = {
   settings: null,
   view: 'folder',          // 'all' = 全部（时间轴） | 'folder' = 某个文件夹
   path: '/',
+  browsePath: '/',         // 最近一次浏览的文件夹，「全部」默认扫它
+  scanScope: '/',          // 本次扫描的起点目录
+  scanDepth: 3,            // 扫描深度，0 表示不限层级
   items: [],               // 当前视图的媒体
   folders: [],             // 当前文件夹的子文件夹
   rawCount: 0,             // 当前文件夹接口返回的原始条目数（含非媒体）
@@ -57,7 +61,7 @@ var state = {
   viewerIndex: -1,
   scanning: false,
   cancelScan: false,
-  scan: { dirs: 0, media: 0, fails: [] },
+  scan: { dirs: 0, media: 0, fails: [], capped: false },
   coverCache: {},
   booted: false,
 };
@@ -581,6 +585,11 @@ function goFolder(path) {
 }
 
 function goAll() {
+  // 在文件夹里点「全部」：扫的就是这个文件夹（不再是整个根目录）。
+  // 已经在「全部」里再点，则保持当前范围不变。
+  if (state.view === 'folder') {
+    state.scanScope = (state.browsePath && state.browsePath !== '/') ? state.browsePath : '/';
+  }
   if (setHash('all', '/')) return;
   openAllNow();
 }
@@ -588,7 +597,9 @@ function goAll() {
 function openFolderNow(path) {
   stopScan();
   state.view = 'folder';
+  document.body.dataset.view = 'folder';
   state.path = path || '/';
+  state.browsePath = state.path;
   try { localStorage.setItem(LS_PATH, state.path); } catch (e) { /* ignore */ }
   markTreeActive();
   $('#albums').innerHTML = '';
@@ -597,9 +608,21 @@ function openFolderNow(path) {
 
 function openAllNow() {
   state.view = 'all';
+  document.body.dataset.view = 'all';
   markTreeActive();
   $('#albums').innerHTML = '';
   scanAll();
+}
+
+/** 把「扫哪儿、扫多深」摆在界面上，避免用户不知道点一下会扫什么 */
+function renderScanScope() {
+  var el = $('#scanScope');
+  var btn = $('#btnScopeRoot');
+  var d = state.scanDepth === 0 ? '全部层级' : state.scanDepth + ' 层';
+  if (el) el.textContent = '范围 ' + (state.scanScope || '/') + ' · ' + d;
+  // 已经在扫全部挂载时，这个按钮就没意义了（用类名而不是 hidden，
+  // 否则会被 .only-all 的 !important 规则盖掉）
+  if (btn) btn.classList.toggle('is-off', (state.scanScope || '/') === '/');
 }
 
 function refreshAll() {
@@ -669,17 +692,24 @@ function scanAll() {
   state.items = [];
   state.folders = [];
   state.rawCount = 0;
-  state.scan = { dirs: 0, media: 0, fails: [] };
+  state.scan = { dirs: 0, media: 0, fails: [], capped: false };
   state.scanning = true;
   state.cancelScan = false;
+  document.body.dataset.view = 'all';
+  renderScanScope();
   markTreeActive();
   var grid = $('#grid');
   grid.classList.remove('flat');
   grid.innerHTML = '';
   $('#albums').innerHTML = '';
 
-  var queue = [{ path: '/', depth: 0 }];
+  // 只扫 state.scanScope 这一棵子树，并按 scanDepth 限制层数。
+  // 之前是从 / 无限层级递归，等于一开「全部」就把整块存储翻一遍。
+  var root = state.scanScope || '/';
+  var limit = state.scanDepth === 0 ? Infinity : state.scanDepth;
+  var queue = [{ path: root, depth: 0 }];
   var seen = {};
+  seen[root] = 1;
   var live = { dates: {}, albums: {} };
 
   return new Promise(function (resolve) {
@@ -697,10 +727,12 @@ function scanAll() {
     }
 
     function step() {
+      try {
       if (state.cancelScan) return finish('cancel');
       if (!queue.length) return finish('done');
       if (state.scan.dirs > SCAN_MAX_DIRS) {
-        state.scan.fails.push({ path: '(扫描上限)', message: '目录数超过 ' + SCAN_MAX_DIRS + '，已停止继续深入' });
+        state.scan.capped = true;
+        state.scan.fails.push({ path: '(已达上限)', message: '目录数超过 ' + SCAN_MAX_DIRS + ' 个，已停止继续深入；可缩小扫描范围或减少深度' });
         return finish('limit');
       }
       var batch = queue.splice(0, SCAN_CONCURRENCY);
@@ -711,7 +743,11 @@ function scanAll() {
           content.forEach(function (o) {
             var full = joinPath(t.path, o.name);
             if (o.is_dir) {
-              if (!seen[full]) { seen[full] = 1; dirs.push({ path: full, depth: t.depth + 1 }); }
+              // 只往下走到设定层数，避免把整个存储翻一遍
+              if (t.depth < limit && !seen[full]) {
+                seen[full] = 1;
+                dirs.push({ path: full, depth: t.depth + 1 });
+              }
             } else {
               var m = toMedia(o, t.path);
               if (m) media.push(m);
@@ -740,11 +776,21 @@ function scanAll() {
           appendTimeline(added, live);   // 边扫边出图，不整块重绘，避免缩略图反复闪烁
         }
         setProgress(
-          '已扫描 ' + state.scan.dirs + ' 个目录，找到 ' + state.scan.media + ' 个媒体文件' + (queue.length ? '（待扫描 ' + queue.length + '）' : ''),
+          '扫描 ' + root + '：已查 ' + state.scan.dirs + ' 个目录，找到 ' + state.scan.media + ' 个媒体' +
+            (queue.length ? '（待查 ' + queue.length + '）' : ''),
           queue.length
         );
         setTimeout(step, 0);   // 让出主线程，同时保证页面不可见时也能继续
+      }).catch(function (e) {
+        // 兜底：任何未预料的异常都要变成看得见的提示，
+        // 否则 Promise 会把错误吞掉，界面上只剩一片空白。
+        state.scan.fails.push({ path: '(扫描中断)', message: String((e && e.message) || e) });
+        finish('error');
       });
+      } catch (e) {
+        state.scan.fails.push({ path: '(扫描异常)', message: String((e && e.message) || e) });
+        finish('error');
+      }
     }
     step();
   });
@@ -799,8 +845,9 @@ function updateStat(list) {
   var parts = [];
   if (state.view === 'all') {
     parts.push('共 ' + list.length + ' 项');
-    if (state.scanning) parts.push('扫描中：' + state.scan.dirs + ' 个目录');
-    else if (state.scan.dirs) parts.push('已扫描 ' + state.scan.dirs + ' 个目录');
+    var d = state.scanDepth === 0 ? '全部层级' : state.scanDepth + ' 层';
+    if (state.scanning) parts.push('扫描中：已查 ' + state.scan.dirs + ' 个目录');
+    else if (state.scan.dirs) parts.push('已查 ' + state.scan.dirs + ' 个目录 · 深度 ' + d + (state.scan.capped ? ' · 已达上限' : ''));
   } else {
     parts.push('此文件夹 ' + list.length + ' 项');
     if (state.folders.length) parts.push(state.folders.length + ' 个子文件夹');
@@ -1219,6 +1266,7 @@ function buildEmpty() {
   if (state.view === 'all') {
     box.innerHTML = '<b>没有找到图片或视频</b>';
     var hint = el('div', 'hint');
+    var dl = state.scanDepth === 0 ? '全部层级' : state.scanDepth + ' 层';
     if (state.scanning) {
       hint.textContent = '正在扫描…';
     } else if (state.scan.fails.length) {
@@ -1226,11 +1274,22 @@ function buildEmpty() {
     } else if (state.kind !== 'all' || state.keyword) {
       hint.textContent = '当前有筛选条件，试试切回「全部」或清空搜索。';
     } else {
-      hint.textContent = '已扫描 ' + state.scan.dirs + ' 个目录。若手机里确实有照片，请到「挂载管理」确认存储是否正常，或点「诊断」查看接口返回。';
+      hint.textContent = '已查过「' + (state.scanScope || '/') + '」下的 ' + state.scan.dirs +
+        ' 个目录（深度 ' + dl + '），没有图片或视频。可以加大深度，或改扫全部挂载。';
     }
     box.appendChild(hint);
     var acts = el('div');
     acts.style.marginTop = '14px';
+    if (!state.scanning && (state.scanScope || '/') !== '/') {
+      var b0 = el('button', 'btn ghost small', '改扫全部挂载');
+      b0.onclick = function () {
+        state.scanScope = '/';
+        renderScanScope();
+        scanAll();
+      };
+      acts.appendChild(b0);
+      acts.appendChild(el('span', null, ' '));
+    }
     var b1 = el('button', 'btn ghost small', '诊断');
     b1.onclick = showDiag;
     acts.appendChild(b1);
@@ -1903,6 +1962,19 @@ function bindUi() {
     applyRowH();
   };
 
+  $('#depthSel').value = String(state.scanDepth);
+  $('#depthSel').onchange = function () {
+    state.scanDepth = Number($('#depthSel').value) || 0;
+    try { localStorage.setItem(LS_DEPTH, String(state.scanDepth)); } catch (e) { /* ignore */ }
+    renderScanScope();
+    if (state.view === 'all') scanAll();   // 改了深度就按新设置重扫
+  };
+  $('#btnScopeRoot').onclick = function () {
+    state.scanScope = '/';
+    renderScanScope();
+    scanAll();
+  };
+
   var kwTimer = null;
   $('#searchInput').addEventListener('input', function (e) {
     clearTimeout(kwTimer);
@@ -1992,10 +2064,20 @@ function boot() {
     state.sort = localStorage.getItem(LS_SORT) || 'date';
     var rh = Number(localStorage.getItem(LS_ROW));
     state.rowH = rh >= 120 && rh <= 480 ? rh : 200;
+    // 注意：localStorage 里没有这个键时 getItem 返回 null，Number(null) 是 0，
+    // 直接判断会误判成「0 = 不限层级」，所以这里先区分 null。
+    var dRaw = localStorage.getItem(LS_DEPTH);
+    var dp = (dRaw === null || dRaw === '') ? NaN : Number(dRaw);
+    state.scanDepth = (isFinite(dp) && dp >= 0 && dp <= 12) ? dp : 3;
+    var last = localStorage.getItem(LS_PATH) || '/';
+    state.browsePath = last;
+    state.path = last;
   } catch (e) { /* ignore */ }
   applyRowH();
+  document.body.dataset.view = 'folder';
   $('#sortSel').value = state.sort;
   $('#sizeSel').value = String(state.rowH);
+  $('#depthSel').value = String(state.scanDepth);
   $$('#segKind button').forEach(function (b) {
     b.setAttribute('data-active', String(b.dataset.kind === state.kind));
   });
@@ -2004,11 +2086,17 @@ function boot() {
   renderAccount();
 
   if (!location.hash) {
-    // 首次进入默认落在「全部」，让用户马上看到东西；hashchange 会负责触发加载
-    location.replace('#/all');
+    // 默认落在「文件夹」视图（回到上次浏览的位置）。
+    // 这一步只有一次目录列表请求，不做任何递归扫描。
+    location.replace('#/p/' + encodeURIComponent(state.browsePath || '/'));
   } else {
     var p0 = parseHash();
-    if (p0.view === 'all') openAllNow(); else openFolderNow(p0.path);
+    if (p0.view === 'all') {
+      state.scanScope = state.browsePath || '/';
+      openAllNow();
+    } else {
+      openFolderNow(p0.path);
+    }
   }
 
   request('/public/settings', { method: 'GET' }).then(function (s) {

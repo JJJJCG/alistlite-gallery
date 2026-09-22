@@ -241,6 +241,14 @@ a { color: inherit; text-decoration: none; }
   color: var(--text-2);
 }
 .seg { display: inline-flex; padding: 3px; border-radius: 999px; background: var(--border-2); }
+
+/* 「扫描范围 / 深度」只在全部（时间轴）视图出现。
+   注意 .mini 也设了 display，同优先级时后定义的会赢，所以这里必须加 !important。
+   另外 hidden 属性（优先级更低）压不过这里的 !important，所以「条件隐藏」要用 .is-off 类。 */
+.only-all { display: none !important; }
+body[data-view="all"] .only-all { display: inline-flex !important; }
+body[data-view="all"] .only-all.is-off { display: none !important; }
+#scanScope { color: var(--text-2); max-width: 42vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .seg button {
   border: 0;
   background: transparent;
