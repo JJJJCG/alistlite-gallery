@@ -9,25 +9,49 @@
 <link rel="icon" href="https://res.oplist.org/logo/logo.svg">
 <link rel="manifest" href="/manifest.json">
 <script>
-/* base_path / cdn / main_color 三个占位符必须保持 "xxx: undefined" 的写法，
- * 后端 static.go 的 initIndex() / UpdateIndex() 会做字符串替换：
- *   "cdn: undefined"        -> cdn: '<配置值>'
- *   "base_path: undefined"  -> base_path: '<URL 路径前缀>'
- *   "main_color: undefined" -> main_color: '<主题色>'
- * 所以静态资源地址只能在运行时拼，写死 href/src 会让自定义路径前缀失效。
+/* 下面 CONFIG 里的四个占位字段（值均为 undefined）由后端 static.go 的
+ * initIndex() / UpdateIndex() 各替换一次 —— 只替换第一次出现，所以注释里
+ * 不要重复出现「字段名 + undefined」的组合字面量，否则会错位替换到注释上：
+ *   cdn 与 base_path —— 站点配置的 CDN 与 URL 路径前缀；
+ *   main_color —— 主题色；
+ *   asset_ver —— gallery.js 的内容哈希。
+ * 为什么需要 asset_ver：/assets/* 带半年长缓存，升级后浏览器只能靠 URL 变化
+ * （资源地址追加 ?v=哈希）拿到新文件，否则旧设备会一直用旧脚本、在新 DOM 上
+ * 报错，表现为页面永远加载不出来。
+ * 静态资源地址只能在运行时拼，写死 href/src 会让自定义路径前缀失效。
  */
-window.CONFIG = { base_path: undefined, cdn: undefined, main_color: undefined };
+window.CONFIG = { base_path: undefined, cdn: undefined, main_color: undefined, asset_ver: undefined };
 (function () {
   var c = window.CONFIG || {};
   var trim = function (s) { return String(s || '').replace(/\/+$/, ''); };
   var base = typeof c.base_path === 'string' ? trim(c.base_path) : '';
   var assetBase = (typeof c.cdn === 'string' && c.cdn) ? trim(c.cdn) + base : base;
+  var vq = (typeof c.asset_ver === 'string' && c.asset_ver) ? ('?v=' + c.asset_ver) : '';
+  window.__assetBase = assetBase;
+  window.__assetVQ = vq;
   var link = document.createElement('link');
   link.rel = 'stylesheet';
-  link.href = assetBase + '/assets/gallery.css';
+  link.href = assetBase + '/assets/gallery.css' + vq;
   document.head.appendChild(link);
-  window.__assetBase = assetBase;
 })();
+/* 脚本/资源加载出错时把原因显示在首屏遮罩上，避免「永远 Loading」无从排查。
+   常见场景：升级后浏览器仍用缓存的旧脚本 —— 清一次缓存或用无痕窗口即可。 */
+window.addEventListener('error', function (e) {
+  var b = document.getElementById('boot');
+  if (!b) return;
+  var msg;
+  if (e && e.message) msg = e.message;
+  else if (e && e.target && (e.target.src || e.target.href)) msg = '资源加载失败：' + (e.target.src || e.target.href);
+  else msg = '未知错误';
+  var t = b.querySelector('.boot-text');
+  if (t) {
+    t.textContent = '脚本出错：' + msg + ' —— 若刚升级过 App，多半是浏览器缓存了旧页面：请清一次该站点缓存，或用无痕窗口再试。';
+    t.style.fontSize = '13px';
+    t.style.maxWidth = '88%';
+    t.style.lineHeight = '1.7';
+    t.style.fontWeight = '400';
+  }
+}, true);
 </script>
 <!-- customize head -->
 </head>
@@ -268,7 +292,7 @@ window.CONFIG = { base_path: undefined, cdn: undefined, main_color: undefined };
 <script>
 (function () {
   var s = document.createElement('script');
-  s.src = (window.__assetBase || '') + '/assets/gallery.js';
+  s.src = (window.__assetBase || '') + '/assets/gallery.js' + (window.__assetVQ || '');
   s.defer = true;
   document.body.appendChild(s);
 })();

@@ -1,6 +1,8 @@
 package static
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -33,6 +35,30 @@ type Manifest struct {
 }
 
 var static fs.FS
+
+// assetVersion 是前端静态资源的内容哈希。前端资源（/assets/*）带 180 天的长缓存，
+// 升级后浏览器必须靠「URL 变化」才能拿到新文件 —— 把内容哈希拼到资源 URL 的 ?v= 上，
+// 每次构建内容有变化，哈希就变，缓存自动失效。否则旧设备会一直用旧脚本，
+// 在新 DOM 上跑出 ReferenceError，表现为「局域网能连上但页面永远加载不出来」。
+var assetVersion string
+
+func computeAssetVersion() {
+	assetVersion = ""
+	name := "assets/gallery.js"
+	f, err := static.Open(name)
+	if err != nil {
+		utils.Log.Warnf("failed to open %s for versioning: %v", name, err)
+		return
+	}
+	defer func() { _ = f.Close() }()
+	content, err := io.ReadAll(f)
+	if err != nil {
+		utils.Log.Warnf("failed to read %s for versioning: %v", name, err)
+		return
+	}
+	sum := sha256.Sum256(content)
+	assetVersion = hex.EncodeToString(sum[:4])
+}
 
 func initStatic() {
 	utils.Log.Debug("Initializing static file system...")
@@ -100,6 +126,7 @@ func initIndex(siteConfig SiteConfig) {
 	replaceMap := map[string]string{
 		"cdn: undefined":        fmt.Sprintf("cdn: '%s'", siteConfig.Cdn),
 		"base_path: undefined":  fmt.Sprintf("base_path: '%s'", siteConfig.BasePath),
+		"asset_ver: undefined":  fmt.Sprintf("asset_ver: '%s'", assetVersion),
 		`href="/manifest.json"`: fmt.Sprintf(`href="%s"`, manifestPath),
 	}
 	conf.RawIndexHtml = replaceStrings(conf.RawIndexHtml, replaceMap)
@@ -179,6 +206,7 @@ func Static(r *gin.RouterGroup, noRoute func(handlers ...gin.HandlerFunc)) {
 	utils.Log.Debug("Setting up static routes...")
 	siteConfig := getSiteConfig()
 	initStatic()
+	computeAssetVersion()
 	initIndex(siteConfig)
 	folders := []string{"assets", "images"}
 
@@ -217,6 +245,9 @@ func Static(r *gin.RouterGroup, noRoute func(handlers ...gin.HandlerFunc)) {
 			c.Status(405)
 			return
 		}
+		// index.html 是资源引用的「入口」，绝不能被浏览器长期缓存：
+		// 旧 HTML + 新（或旧）assets 的组合都会让前端跑不起来。
+		c.Header("Cache-Control", "no-cache, no-store, must-revalidate")
 		c.Header("Content-Type", "text/html")
 		c.Status(200)
 		if strings.HasPrefix(c.Request.URL.Path, "/@manage") {
