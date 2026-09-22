@@ -560,6 +560,14 @@ body[data-view="all"] .only-all.is-off { display: none !important; }
 .form { display: flex; flex-direction: column; gap: 12px; }
 .form label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--text-2); }
 .form label.row-check { flex-direction: row; align-items: center; gap: 8px; }
+.form-row { display: flex; gap: 16px; align-items: center; }
+.form-row > label { flex: 0 0 auto; }
+.form-row > label.row-check { flex: 1; }
+#stAdvanced { border: 1px dashed var(--border); border-radius: 8px; padding: 8px 10px; }
+#stAdvanced summary { cursor: pointer; font-size: 13px; color: var(--text-3); user-select: none; }
+#stAdvanced[open] summary { margin-bottom: 8px; }
+#stAdvanced textarea { min-height: 120px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12.5px; }
+.confirm-msg { font-size: 14px; line-height: 1.6; color: var(--text); }
 .form input, .form select, .form textarea {
   border: 1px solid var(--border);
   border-radius: 6px;

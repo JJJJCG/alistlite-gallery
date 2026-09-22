@@ -1433,8 +1433,9 @@ async function copyText(text, okMsg) {
     ta.remove();
     if (ok) { toast(okMsg || '已复制'); return true; }
   } catch (e2) { /* 走兜底 */ }
-  // 通过 http://局域网IP 访问时不是安全上下文，剪贴板 API 不可用，退化为手动复制
-  window.prompt('自动复制失败，请长按选中后复制：', text);
+  // 通过 http://局域网IP 访问时不是安全上下文，剪贴板 API 不可用；
+  // WebView 里 window.prompt 也是静默失败，所以只提示手动复制
+  toast('自动复制失败，请长按链接手动复制', 4000);
   return false;
 }
 
@@ -1670,19 +1671,61 @@ function runDiag() {
 
 /* ------------------------------------------------------------------ 挂载管理 */
 
+/* 各驱动的 addition 字段与真实驱动代码（drivers 目录下各 meta.go）一一对应：
+   连接字段是 address（不是 host 或 url）；WebDav 的驱动名是 "WebDav" 不是 "WebDAV"。 */
 var DRIVER_TEMPLATE = {
   Local: { root_folder_path: '/storage/emulated/0', thumbnail: false, thumb_cache_folder: '', show_hidden: true, mkdir_perm: '777', recycle_bin_path: 'delete permanently' },
-  SMB: { host: '', username: '', password: '', share_name: '', root_folder_path: '/' },
-  SFTP: { host: '', username: '', password: '', private_key: '', passphrase: '', root_folder_path: '/' },
-  WebDAV: { url: '', username: '', password: '', vendor: 'other', root_folder_path: '/' },
+  SMB: { root_folder_path: '/', address: '', username: '', password: '', share_name: '' },
+  SFTP: { root_folder_path: '/', address: '', username: '', password: '', private_key: '', passphrase: '', ignore_symlink_error: false },
+  WebDav: { root_folder_path: '/', address: '', username: '', password: '', vendor: 'other', tls_insecure_skip_verify: false },
+};
+/* 驱动专属输入框（root_folder_path 是公共字段，单独用「要挂载的目录」输入框） */
+var DRIVER_FIELDS = {
+  Local: [],
+  SMB: [
+    { key: 'address', label: '服务器地址', ph: '192.168.1.9:445', req: true },
+    { key: 'share_name', label: '共享名称', ph: '共享名，不是路径', req: true },
+    { key: 'username', label: '用户名', ph: '匿名访问可留空' },
+    { key: 'password', label: '密码', type: 'password' },
+  ],
+  SFTP: [
+    { key: 'address', label: '服务器地址', ph: '192.168.1.9:22', req: true },
+    { key: 'username', label: '用户名', req: true },
+    { key: 'password', label: '密码', type: 'password' },
+  ],
+  WebDav: [
+    { key: 'address', label: '服务器地址', ph: 'http://192.168.1.9:5005/dav', req: true },
+    { key: 'username', label: '用户名', req: true },
+    { key: 'password', label: '密码', type: 'password', req: true },
+  ],
 };
 var DRIVER_HINT = {
-  Local: 'root_folder_path 填手机上的绝对路径，例如 /storage/emulated/0（内置存储根目录）或 /storage/emulated/0/DCIM。',
-  SMB: 'host 形如 192.168.1.9:445，share_name 填共享名（不是路径）。',
-  SFTP: 'host 形如 192.168.1.9:22，可填密码或 private_key。',
-  WebDAV: 'url 填完整地址，例如 https://example.com/dav。',
+  Local: '填手机里的绝对路径：/storage/emulated/0 是内置存储根目录，/storage/emulated/0/DCIM 是相册目录。',
+  SMB: '手机和 SMB 服务器需在同一网络；地址形如 192.168.1.9:445。',
+  SFTP: '地址形如 192.168.1.9:22，用密码登录。',
+  WebDav: '地址填完整 URL，例如 http://192.168.1.9:5005/dav。',
 };
 var editingId = 0;
+var stAdd = null;            // 当前表单的 addition 对象（友好输入框的数据源）
+var stAdvancedDirty = false; // 用户是否手动改过「高级」JSON
+
+/* App 的 WebView 没实现 window.confirm/alert/prompt（调用会静默失败），
+   所有关键确认都走这个自带弹层，返回 Promise<boolean>。 */
+function uiConfirm(msg) {
+  return new Promise(function (resolve) {
+    var box = $('#confirmBox');
+    $('#confirmMsg').textContent = msg;
+    box.hidden = false;
+    function done(v) {
+      box.hidden = true;
+      $('#confirmYes').onclick = null;
+      $('#confirmNo').onclick = null;
+      resolve(v);
+    }
+    $('#confirmYes').onclick = function () { done(true); };
+    $('#confirmNo').onclick = function () { done(false); };
+  });
+}
 
 function openAdmin() {
   $('#admin').hidden = false;
@@ -1713,16 +1756,20 @@ function refreshStorages() {
       bEdit.onclick = function () { fillForm(s); };
       var bToggle = el('button', 'btn ghost small', s.disabled ? '启用' : '停用');
       bToggle.onclick = function () {
-        request('/admin/storage/' + (s.disabled ? 'enable' : 'disable'), { body: { id: s.id } })
+        // 后端从 URL 查询参数取 id（c.Query("id")），放 body 里会报 invalid id
+        request('/admin/storage/' + (s.disabled ? 'enable' : 'disable'), { query: { id: s.id } })
           .then(function () { toast(s.disabled ? '已启用' : '已停用'); refreshStorages(); })
-          .catch(function (e) { toast(e.message); });
+          .catch(function (e) { toast('操作失败：' + e.message); });
       };
       var bDel = el('button', 'btn ghost small danger', '删除');
       bDel.onclick = function () {
-        if (!confirm('确认删除挂载「' + (s.mount_path || '/') + '」？不会删除源文件。')) return;
-        request('/admin/storage/delete', { body: { id: s.id } })
-          .then(function () { toast('已删除'); refreshStorages(); })
-          .catch(function (e) { toast(e.message); });
+        // App 的 WebView 没实现 window.confirm，用自带的确认弹层
+        uiConfirm('删除挂载「' + (s.mount_path || '/') + '」？只解除挂载，不会删除手机里的文件。').then(function (yes) {
+          if (!yes) return;
+          request('/admin/storage/delete', { query: { id: s.id } })
+            .then(function () { toast('已删除'); refreshStorages(); loadMeAndStorages(); renderMounts(); })
+            .catch(function (e) { toast('删除失败：' + e.message, 5000); });
+        });
       };
       acts.appendChild(bEdit); acts.appendChild(bToggle); acts.appendChild(bDel);
       top.appendChild(acts);
@@ -1751,45 +1798,94 @@ function fillForm(s) {
   $('#stMount').value = s.mount_path || '/';
   $('#stOrder').value = s.order || 0;
   $('#stSign').checked = !!s.enable_sign;
-  var add = s.addition || '';
-  try {
-    var obj = JSON.parse(add);
-    $('#stAddition').value = JSON.stringify(obj, null, 2);
-  } catch (e) {
-    $('#stAddition').value = add || JSON.stringify(DRIVER_TEMPLATE[s.driver || 'Local'], null, 2);
-  }
-  onDriverChange();
-  window.scrollTo(0, 0);
+  var add = {};
+  try { add = JSON.parse(s.addition || '{}') || {}; } catch (e) { add = {}; }
+  stAdd = Object.assign({}, DRIVER_TEMPLATE[s.driver || 'Local'] || {}, add);
+  stAdvancedDirty = false;
+  $('#stAdvanced').open = false;
+  renderDriverFields();
   $('#admin').querySelector('.sheet-body').scrollTop = 99999;
 }
 
-function onDriverChange() {
+function syncStForm() {
+  // 把 stAdd 同步到友好输入框；高级 JSON 只在用户没手动改过时刷新
+  $('#stRoot').value = stAdd.root_folder_path || '';
+  $$('#stDriverFields input').forEach(function (inp) {
+    inp.value = stAdd[inp.dataset.key] || '';
+  });
+  if (!stAdvancedDirty) $('#stAddition').value = JSON.stringify(stAdd, null, 2);
+}
+
+function renderDriverFields() {
   var d = $('#stDriver').value;
   $('#stDriverHint').textContent = DRIVER_HINT[d] || '';
-  if (!editingId) {
-    $('#stAddition').value = JSON.stringify(DRIVER_TEMPLATE[d] || {}, null, 2);
-  }
-  $('#stSchema').innerHTML = '';
+  var box = $('#stDriverFields');
+  box.innerHTML = '';
+  (DRIVER_FIELDS[d] || []).forEach(function (f) {
+    var lab = el('label', null, f.label + (f.req ? ' *' : '') + ' ');
+    var inp = document.createElement('input');
+    inp.type = f.type || 'text';
+    inp.placeholder = f.ph || '';
+    inp.dataset.key = f.key;
+    inp.addEventListener('input', function () {
+      stAdd[f.key] = inp.value;
+      if (!stAdvancedDirty) $('#stAddition').value = JSON.stringify(stAdd, null, 2);
+    });
+    lab.appendChild(inp);
+    box.appendChild(lab);
+  });
+  $('#stRoot').oninput = function () {
+    stAdd.root_folder_path = $('#stRoot').value;
+    if (!stAdvancedDirty) $('#stAddition').value = JSON.stringify(stAdd, null, 2);
+  };
+  syncStForm();
+}
+
+/* 用户手动换了驱动：除已填的目录外，其余字段取新驱动的默认值 */
+function onDriverChange() {
+  var tpl = DRIVER_TEMPLATE[$('#stDriver').value] || {};
+  var keepRoot = stAdd ? stAdd.root_folder_path : '';
+  stAdd = Object.assign({}, tpl);
+  if (keepRoot) stAdd.root_folder_path = keepRoot;
+  stAdvancedDirty = false;
+  $('#stAdvanced').open = false;
+  renderDriverFields();
 }
 
 function saveStorage() {
   var driver = $('#stDriver').value;
-  var addition = $('#stAddition').value.trim();
-  if (addition) {
-    try { addition = JSON.stringify(JSON.parse(addition)); } catch (e) {
-      toast('配置不是合法 JSON：' + e.message, 4000);
-      return;
-    }
-  } else {
-    addition = '{}';
-  }
   var mount = ($('#stMount').value.trim() || '/');
+  // 组装 addition：默认以友好输入框为准；若用户手动改过「高级」JSON，则以 JSON 为准
+  var add;
+  if (stAdvancedDirty) {
+    var raw = $('#stAddition').value.trim();
+    if (raw) {
+      try { add = JSON.parse(raw); } catch (e) {
+        toast('高级配置不是合法 JSON：' + e.message, 4000);
+        return;
+      }
+    } else { add = {}; }
+  } else {
+    stAdd.root_folder_path = $('#stRoot').value.trim();
+    $$('#stDriverFields input').forEach(function (inp) { stAdd[inp.dataset.key] = inp.value; });
+    add = Object.assign({}, DRIVER_TEMPLATE[driver] || {}, stAdd);
+  }
+  // 必填项检查：能拦住大部分「挂上了但什么都看不到」的情况
+  var missing = [];
+  if (!String(add.root_folder_path || '').trim()) missing.push('要挂载的目录');
+  (DRIVER_FIELDS[driver] || []).forEach(function (f) {
+    if (f.req && !String(add[f.key] || '').trim()) missing.push(f.label);
+  });
+  if (missing.length) {
+    toast('请先填写：' + missing.join('、'), 5000);
+    return;
+  }
   var payload = {
     id: editingId || undefined,
     mount_path: mount,
     order: Number($('#stOrder').value || 0),
     driver: driver,
-    addition: addition,
+    addition: JSON.stringify(add),
     enable_sign: $('#stSign').checked,
     disabled: false,
     remark: '',
@@ -1832,37 +1928,6 @@ function saveStorage() {
     submit();
     return null;
   }).catch(function () { submit(); });   // 列表拿不到就直接提交，让后端给结论
-}
-
-function showSchema() {
-  var d = $('#stDriver').value;
-  var box = $('#stSchema');
-  box.innerHTML = '';
-  box.appendChild(el('div', 'hint', '读取字段说明…'));
-  request('/admin/driver/info', { method: 'GET', query: { driver: d } }).then(function (items) {
-    box.innerHTML = '';
-    if (!items || !items.length) {
-      box.appendChild(el('div', 'hint', '该驱动没有额外字段。'));
-      return;
-    }
-    var table = el('table');
-    var head = el('tr');
-    ['字段', '类型', '默认值', '说明'].forEach(function (h) { head.appendChild(el('th', null, h)); });
-    table.appendChild(head);
-    items.forEach(function (it) {
-      var tr = el('tr');
-      var c1 = el('td'); c1.appendChild(el('code', null, it.name || '')); tr.appendChild(c1);
-      tr.appendChild(el('td', null, it.type || ''));
-      tr.appendChild(el('td', null, it.default === undefined ? '' : String(it.default)));
-      var help = (it.help || '') + (it.required ? '（必填）' : '');
-      tr.appendChild(el('td', null, help));
-      table.appendChild(tr);
-    });
-    box.appendChild(table);
-  }).catch(function (e) {
-    box.innerHTML = '';
-    box.appendChild(el('div', 'hint err', '读取失败：' + e.message));
-  });
 }
 
 /* ------------------------------------------------------------------ 侧栏开关 */
@@ -1926,7 +1991,7 @@ function bindUi() {
   };
   $('#loginPass').addEventListener('keydown', function (e) { if (e.key === 'Enter') doLogin(); });
   $('#stDriver').addEventListener('change', onDriverChange);
-  $('#stSchemaBtn').onclick = showSchema;
+  $('#stAddition').addEventListener('input', function () { stAdvancedDirty = true; });
   $('#stSave').onclick = saveStorage;
   $('#stCancel').onclick = function () {
     editingId = 0;
@@ -1934,6 +1999,9 @@ function bindUi() {
     $('#stMount').value = '/';
     $('#stOrder').value = 0;
     $('#stSign').checked = false;
+    stAdd = Object.assign({}, DRIVER_TEMPLATE[$('#stDriver').value] || {});
+    stAdvancedDirty = false;
+    $('#stAdvanced').open = false;
     onDriverChange();
   };
 

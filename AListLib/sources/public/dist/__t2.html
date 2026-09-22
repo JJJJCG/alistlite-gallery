@@ -264,5 +264,54 @@ window.CONFIG = { base_path: undefined, cdn: undefined, main_color: undefined };
   document.body.appendChild(s);
 })();
 </script>
-</body>
+<script>
+(function () {
+  var step = (location.search.match(/step=([abc])/) || [,'a'])[1];
+  var out = [];
+  function log(k, v) { out.push(k + '=' + v); document.getElementById('out').textContent = out.join(' | '); }
+  function q(sel) { return document.querySelector(sel); }
+  setTimeout(function () {
+    openAdmin();
+    setTimeout(function () {
+      q('#stDriver').value = 'Local';
+      onDriverChange();
+      q('#stMount').value = '/TestMount';
+      q('#stRoot').value = '/storage/emulated/0/DCIM';
+      saveStorage();
+      setTimeout(function () {
+        var txt = q('#storageList').innerText || '';
+        log('A_list_has_new', txt.indexOf('/TestMount') >= 0);
+        log('A_root_shown', txt.indexOf('/storage/emulated/0/DCIM') >= 0);
+        var del = null;
+        Array.prototype.forEach.call(document.querySelectorAll('#storageList .storage-item'), function (it) {
+          if ((it.innerText || '').indexOf('/TestMount') >= 0) del = it.querySelector('.danger');
+        });
+        log('B_delete_btn', !!del);
+        if (step !== 'a' && del) {
+          del.click();
+          setTimeout(function () {
+            log('B_confirm_visible', !q('#confirmBox').hidden);
+            log('B_confirm_text', (q('#confirmMsg').textContent || '').slice(0, 40));
+            if (step === 'c') {
+              q('#confirmYes').click();
+              setTimeout(function () {
+                var t2 = q('#storageList').innerText || '';
+                log('C_deleted', t2.indexOf('/TestMount') < 0);
+                log('C_confirm_closed', q('#confirmBox').hidden);
+                log('C_remaining', t2.replace(/\s+/g, ' ').slice(0, 90));
+                document.title = 'DONE-' + step;
+              }, 1600);
+            } else {
+              document.title = 'DONE-' + step;
+            }
+          }, 500);
+        } else {
+          document.title = 'DONE-' + step;
+        }
+      }, 1800);
+    }, 900);
+  }, 1400);
+})();
+</script>
+<div id="out" style="position:fixed;left:4px;bottom:4px;background:#fff;color:#000;font-size:12px;z-index:99999;padding:3px 8px;border:1px solid #000">running...</div></body>
 </html>

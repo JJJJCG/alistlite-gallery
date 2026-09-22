@@ -264,5 +264,38 @@ window.CONFIG = { base_path: undefined, cdn: undefined, main_color: undefined };
   document.body.appendChild(s);
 })();
 </script>
-</body>
+<script>
+(function () {
+  var out = [];
+  function log(k, v) { out.push(k + '=' + v); document.getElementById('out').textContent = out.join(' | '); }
+  function q(sel) { return document.querySelector(sel); }
+  setTimeout(function () {
+    openAdmin();
+    setTimeout(function () {
+      var target = null;
+      Array.prototype.forEach.call(document.querySelectorAll('#storageList .storage-item'), function (it) {
+        if ((it.innerText || '').indexOf('/nas') >= 0) target = it;
+      });
+      log('D_found_nas', !!target);
+      if (target) {
+        target.querySelector('.acts .btn').click();
+        setTimeout(function () {
+          log('D_driver', q('#stDriver').value);
+          log('D_mount', q('#stMount').value);
+          log('D_root', q('#stRoot').value);
+          var f = {};
+          Array.prototype.forEach.call(document.querySelectorAll('#stDriverFields input'), function (inp) { f[inp.dataset.key] = inp.value; });
+          log('D_address', f.address);
+          log('D_share', f.share_name);
+          log('D_title', q('#stFormTitle').textContent);
+          document.title = 'DONE-d';
+        }, 700);
+      } else {
+        document.title = 'DONE-d';
+      }
+    }, 900);
+  }, 1400);
+})();
+</script>
+<div id="out" style="position:fixed;left:4px;bottom:4px;background:#fff;color:#000;font-size:12px;z-index:99999;padding:3px 8px;border:1px solid #000">running...</div></body>
 </html>
