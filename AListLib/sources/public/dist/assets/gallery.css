@@ -75,22 +75,7 @@ a { color: inherit; text-decoration: none; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .boot-text { color: var(--text-3); font-size: 20px; font-weight: 300; letter-spacing: .5px; }
 
-/* ---------------------------------------------------------------- 顶栏 */
-
-#topbar {
-  position: sticky;
-  top: 0;
-  z-index: 30;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 16px;
-  background: var(--bg);
-  box-shadow: var(--shadow-sep);
-}
-.brand { margin: 0; display: flex; align-items: center; gap: 8px; min-width: 0; }
-.brand img { height: 38px; width: auto; max-width: 120px; object-fit: contain; }
-.brand span { font-size: 24px; font-weight: 300; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* ------------------------------------------------ 顶栏已移除：搜索在筛选栏，上传/诊断在侧边栏 */
 
 .icon-btn {
   display: inline-flex;
@@ -111,9 +96,9 @@ a { color: inherit; text-decoration: none; }
   display: flex;
   align-items: center;
   gap: 8px;
-  min-width: 180px;
-  max-width: 340px;
-  flex: 1 1 220px;
+  min-width: 140px;
+  max-width: 320px;
+  flex: 1 1 200px;
   height: 40px;
   padding: 0 12px;
   border-radius: var(--radius);
@@ -122,11 +107,22 @@ a { color: inherit; text-decoration: none; }
 }
 .search-box input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font-size: 14px; color: var(--text); }
 
+/* ------------------------------------------------ 移动到…选择器 */
+
+.move-crumb { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; margin-bottom: 10px; }
+.crumb-btn { border: 0; background: transparent; color: var(--primary, #4a89dc); cursor: pointer; font-size: 13.5px; padding: 3px 5px; border-radius: 6px; }
+.crumb-btn:hover { background: var(--border-2); }
+.crumb-sep { color: var(--text-3); font-size: 12px; }
+.move-dirs { display: flex; flex-direction: column; gap: 4px; min-height: 120px; max-height: 320px; overflow-y: auto; }
+.move-row { display: flex; align-items: center; gap: 10px; border: 0; background: transparent; color: var(--text); text-align: left; padding: 10px 10px; border-radius: var(--radius); cursor: pointer; font-size: 14.5px; }
+.move-row:hover { background: var(--border-2); }
+.move-row svg { color: var(--text-3); flex: none; }
+
 /* ---------------------------------------------------------------- 侧栏 */
 
 #sidebar {
   position: fixed;
-  top: 74px;
+  top: var(--side-gap);
   left: var(--side-gap);
   width: var(--side-w);
   bottom: 0;
@@ -665,8 +661,7 @@ body[data-view="all"] .only-all.is-off { display: none !important; }
 .narrow-only { display: none; }
 
 @media (min-width: 1024px) {
-  #topbar { padding: 14px 32px 12px; }
-  #content { margin: 20px 32px 80px calc(var(--side-w) + var(--side-gap) + 20px); }
+  #content { margin: 16px 32px 80px calc(var(--side-w) + var(--side-gap) + 20px); }
 }
 
 @media (max-width: 1023px) {
@@ -690,8 +685,6 @@ body[data-view="all"] .only-all.is-off { display: none !important; }
   :root { --row-h: 150px; }
   .narrow-only { display: inline-flex; }
   .narrow-hide { display: none; }
-  .brand img { height: 30px; max-width: 84px; }
-  .brand span { font-size: 19px; }
   .album-box { width: 45vw; }
   .album-box .cover { height: 45vw; }
   .v-title { max-width: 34vw; font-size: 13px; }

@@ -39,29 +39,7 @@ window.CONFIG = { base_path: undefined, cdn: undefined, main_color: undefined };
   <div class="boot-text">Loading...</div>
 </div>
 
-<header id="topbar">
-  <button id="btnMenu" class="icon-btn narrow-only" aria-label="打开菜单">
-    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
-  </button>
-  <h1 class="brand">
-    <img id="brandLogo" src="https://res.oplist.org/logo/logo.png" alt="">
-    <span id="brandText">Loading...</span>
-  </h1>
-  <div class="grow"></div>
-  <div class="search-box narrow-hide">
-    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
-    <input id="searchInput" type="search" placeholder="搜索名称…" autocomplete="off">
-  </div>
-  <button id="btnUpload" class="icon-btn" title="上传到当前文件夹">
-    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></svg>
-  </button>
-  <button id="btnDiag" class="icon-btn" title="连接状态与诊断">
-    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>
-  </button>
-  <button id="btnAdmin" class="icon-btn" title="挂载管理">
-    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 1.56V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 9 19.4a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.56-1H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.56V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.56 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9v.09a1.7 1.7 0 0 0 1.56 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.51 1z"/></svg>
-  </button>
-</header>
+<!-- 顶栏已按需求移除：上传/诊断收进侧边栏，搜索移到筛选栏；移动端从筛选栏左侧的汉堡按钮打开侧边栏 -->
 
 <aside id="sidebar" aria-label="媒体库导航">
   <div class="side-group">
@@ -70,6 +48,10 @@ window.CONFIG = { base_path: undefined, cdn: undefined, main_color: undefined };
         <span class="mi" style="background:#8ac5f4">
           <svg viewBox="0 0 24 24" fill="white"><path d="M5.6 14L9.6 18 5.4 24H3a3 3 0 0 1-3-2.7L5.6 14Zm10.1-4L24 21.5A3 3 0 0 1 21 24H5.9L15.7 10Z"/></svg>
         </span><span class="ml">全部</span></button></li>
+      <li><button id="navUpload" class="menu-btn" data-active="false">
+        <span class="mi" style="background:#9fd6a8">
+          <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></svg>
+        </span><span class="ml">上传到当前文件夹</span></button></li>
     </ul>
   </div>
   <div class="side-group">
@@ -78,6 +60,10 @@ window.CONFIG = { base_path: undefined, cdn: undefined, main_color: undefined };
   </div>
   <div class="side-group side-foot">
     <ul class="menu">
+      <li><button id="navDiag" class="menu-btn" data-active="false">
+        <span class="mi" style="background:#c9b3e6">
+          <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>
+        </span><span class="ml">连接与诊断</span></button></li>
       <li><button id="navAccount" class="menu-btn" data-active="false">
         <span class="mi" style="background:#fbcd78">
           <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="9" r="3.4"/><path d="M5.4 19.6c1.3-3.1 3.8-4.6 6.6-4.6s5.3 1.5 6.6 4.6"/></svg>
@@ -95,6 +81,14 @@ window.CONFIG = { base_path: undefined, cdn: undefined, main_color: undefined };
   <div id="banner" hidden></div>
 
   <div id="filterbar">
+    <button id="btnMenu" class="icon-btn narrow-only" aria-label="打开菜单">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+    </button>
+    <div class="search-box">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input id="searchInput" type="search" placeholder="搜索名称…" autocomplete="off">
+    </div>
+    <div class="grow"></div>
     <div class="seg" id="segKind">
       <button data-kind="all" data-active="true">全部</button>
       <button data-kind="image" data-active="false">图片</button>
@@ -229,15 +223,30 @@ window.CONFIG = { base_path: undefined, cdn: undefined, main_color: undefined };
   </div>
 </div>
 
-<!-- 账号：App 内置页面走本机地址，默认免密即为管理员，这里主要给局域网访问时用 -->
+<!-- 移动到…：浏览式选择目标文件夹，确认后调 /api/fs/move -->
+<div id="moveSheet" class="sheet" hidden>
+  <div class="sheet-card narrow">
+    <div class="sheet-head"><b>移动到…</b><button class="icon-btn" data-close="moveSheet">✕</button></div>
+    <div class="sheet-body">
+      <div id="moveCrumb" class="move-crumb"></div>
+      <div id="moveDirs" class="move-dirs"></div>
+    </div>
+    <div class="sheet-foot">
+      <button class="btn ghost" id="moveCancel">取消</button>
+      <button class="btn primary" id="moveGo">移动到这里</button>
+    </div>
+  </div>
+</div>
+
+<!-- 账号：服务端已全端免密（无 token 一律按管理员），这里主要展示当前身份 -->
 <div id="login" class="sheet" hidden>
   <div class="sheet-card narrow">
     <div class="sheet-head"><b>账号</b><button class="icon-btn" data-close="login">✕</button></div>
     <div class="sheet-body">
       <div id="loginState" class="state-box">检测中…</div>
       <div class="hint" style="margin-top:10px">
-        在 App 里打开时走本机地址（127.0.0.1），默认免密且就是管理员，通常不用登录。
-        只有用别的设备通过局域网 IP 访问、或想以非管理员身份访问时，才需要在下面填写账号密码。
+        本应用不设密码：不管在 App 内还是局域网访问，都以管理员身份直接使用，无需登录。
+        下面的表单仅在后端为旧版本（还要求登录）时才会用到。
       </div>
       <div class="form" style="margin-top:14px">
         <label>用户名 <input id="loginUser" autocomplete="username"></label>

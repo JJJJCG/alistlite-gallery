@@ -388,13 +388,13 @@ function renderAccount() {
   var box = $('#loginState');
   if (!box) return;
   if (me) {
-    var extra = state.token ? '已登录' : '本机免密';
+    var extra = state.token ? '已登录' : '免密';
     setStateBox(box, me.role === 2 ? 'ok' : 'warn',
       me.username + ' · ' + roleName(me.role) + '（' + extra + '）');
   } else if (state.token) {
     setStateBox(box, 'warn', '已保存登录凭据，但读取用户信息失败');
   } else {
-    setStateBox(box, 'warn', '访客身份。用本机地址（App 内打开）访问时自动就是管理员。');
+    setStateBox(box, 'warn', '未获取到身份。本应用已全端免密，若看到这条请确认服务端为最新版本。');
   }
 }
 
@@ -1468,9 +1468,90 @@ function openItemMenu(item, x, y) {
     { label: '复制文件名', onClick: function () { copyText(item.name, '文件名已复制'); } },
     { label: '复制 Markdown', onClick: function () { copyText('[' + item.name + '](' + abs + ')', 'Markdown 已复制'); } },
     { sep: true },
+    { label: '移动到…', onClick: function () { openMovePicker(item); } },
     { label: '在新标签页打开', onClick: function () { window.open(abs, '_blank', 'noopener'); } },
     { label: '下载', onClick: function () { downloadItem(item, abs); } },
   ], item.name);
+}
+
+/* ---------------------------- 移动到…（浏览式选择目标文件夹） ---------------------------- */
+
+var moveCtx = null; // { item, srcDir, cur }
+
+function openMovePicker(item) {
+  if (!item || !item.path) return;
+  var dir = item.path.slice(0, item.path.lastIndexOf('/')) || '/';
+  moveCtx = { item: item, srcDir: dir, cur: dir };
+  $('#moveSheet').hidden = false;
+  renderMoveDirs(dir);
+}
+
+function renderMoveDirs(path) {
+  moveCtx.cur = path;
+  // 面包屑：根目录 / 一级 / 二级
+  var crumb = $('#moveCrumb');
+  crumb.innerHTML = '';
+  var parts = path === '/' ? [] : path.replace(/^\//, '').split('/');
+  var mk = function (label, p) {
+    var b = el('button', 'crumb-btn', label);
+    b.onclick = function () { renderMoveDirs(p); };
+    return b;
+  };
+  crumb.appendChild(mk('根目录', '/'));
+  var acc = '';
+  parts.forEach(function (seg) {
+    acc += '/' + seg;
+    crumb.appendChild(el('span', 'crumb-sep', '›'));
+    crumb.appendChild(mk(seg, acc));
+  });
+  var box = $('#moveDirs');
+  box.innerHTML = '';
+  box.appendChild(el('div', 'tree-msg', '读取中…'));
+  listDirs(path).then(function (list) {
+    box.innerHTML = '';
+    var dirs = (list || []).filter(function (d) { return d.name; });
+    if (!dirs.length) {
+      box.appendChild(el('div', 'tree-msg', '这里没有子文件夹'));
+      return;
+    }
+    dirs.forEach(function (d) {
+      var row = el('button', 'move-row');
+      row.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h4l2 2.5h9A1.5 1.5 0 0 1 21 9v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18V6.5Z"/></svg>';
+      row.appendChild(el('span', null, d.name));
+      row.onclick = function () { renderMoveDirs(joinPath(path, d.name)); };
+      box.appendChild(row);
+    });
+  }).catch(function (e) {
+    box.innerHTML = '';
+    var m = el('div', 'tree-msg', e.message);
+    m.style.color = 'var(--danger)';
+    box.appendChild(m);
+  });
+}
+
+function doMove() {
+  if (!moveCtx) return;
+  var item = moveCtx.item;
+  var srcDir = moveCtx.srcDir;
+  var dstDir = moveCtx.cur;
+  if (dstDir === srcDir) {
+    toast('已经在这个文件夹里了');
+    return;
+  }
+  $('#moveGo').disabled = true;
+  request('/fs/move', { body: { src_dir: srcDir, dst_dir: dstDir, names: [item.name] } })
+    .then(function () {
+      $('#moveSheet').hidden = true;
+      toast('已移动到 ' + dstDir);
+      // 从当前视图里移除该文件（如果它正在显示）
+      var idx = state.items.indexOf(item);
+      if (idx >= 0) { state.items.splice(idx, 1); render(); }
+      else if (state.view === 'all' && state.scanning) { /* 扫描中的会随扫描自然更新 */ }
+    })
+    .catch(function (e) {
+      toast('移动失败：' + e.message, 6000);
+    })
+    .then(function () { $('#moveGo').disabled = false; });
 }
 
 function downloadItem(item, url) {
@@ -1587,18 +1668,18 @@ function runDiag() {
 
     body.appendChild(el('div', 'diag-sec', '登录状态'));
     body.appendChild(row('本地 token',
-      state.token ? '有（' + state.token.slice(0, 12) + '…）' : '无（本机访问免密）',
+      state.token ? '有（' + state.token.slice(0, 12) + '…）' : '无（全端免密）',
       state.token ? 'diag-ok' : ''));
     if (me && me.__err) {
       body.appendChild(row('/api/me', me.__err.message + (me.__err.status ? '（HTTP ' + me.__err.status + '）' : ''), 'diag-bad'));
-      body.appendChild(el('div', 'hint', '若是从别的设备用局域网地址打开，属正常（那个来源是访客）；在 App 内打开则应为管理员。'));
+      body.appendChild(el('div', 'hint', '本应用已全端免密，正常应直接返回管理员。出现这条说明服务端可能是旧版本，请更新 App。'));
     } else if (!me) {
       body.appendChild(row('/api/me', '未取到返回', 'diag-bad'));
     } else {
       body.appendChild(row('用户名', me.username || '-'));
       var isAdmin = me.role === 2;
       body.appendChild(row('角色',
-        roleName(me.role) + '（role=' + me.role + '）' + (!state.token && isAdmin ? ' · 本机免密' : ''),
+        roleName(me.role) + '（role=' + me.role + '）' + (!state.token && isAdmin ? ' · 免密' : ''),
         isAdmin ? 'diag-ok' : 'diag-bad'));
       if (me.base_path && me.base_path !== '/') body.appendChild(row('用户根目录', me.base_path));
       if (me.disabled) body.appendChild(row('账号状态', '已禁用', 'diag-bad'));
@@ -1983,8 +2064,8 @@ function loadMeAndStorages() {
     state.me = null;
     renderAccount();
     if (isAuthError(e)) {
-      showBanner('warn', '当前是访客身份，无法配置。若用局域网地址访问，请点右下角「账号」登录；用 App 内打开则自动是管理员。', [
-        { label: '账号', onClick: function () { openLogin(); } },
+      showBanner('warn', '没有拿到管理员身份。本应用已全端免密，请确认服务端是最新版本；若仍异常，点「诊断」查看接口返回。', [
+        { label: '诊断', onClick: showDiag },
       ]);
     }
     return null;
@@ -1993,12 +2074,12 @@ function loadMeAndStorages() {
 
 function bindUi() {
   $('#navAll').onclick = function () { goAll(); closeSidebar(); };
+  $('#navUpload').onclick = function () { closeSidebar(); pickAndUpload(); };
   $('#navAccount').onclick = function () { openLogin(); closeSidebar(); };
+  $('#navDiag').onclick = function () { closeSidebar(); showDiag(); };
   $('#navSettings').onclick = function () { openAdmin(); closeSidebar(); };
-  $('#btnAdmin').onclick = openAdmin;
   $('#btnMenu').onclick = openSidebar;
   $('#scrim').onclick = closeSidebar;
-  $('#btnDiag').onclick = showDiag;
   $('#diagRerun').onclick = runDiag;
   $('#diagLogout').onclick = function () {
     $('#diag').hidden = true;
@@ -2010,6 +2091,9 @@ function bindUi() {
     $('#login').hidden = true;
   };
   $('#loginPass').addEventListener('keydown', function (e) { if (e.key === 'Enter') doLogin(); });
+  // 「移动到…」弹层
+  $('#moveCancel').onclick = function () { $('#moveSheet').hidden = true; };
+  $('#moveGo').onclick = doMove;
   $('#stDriver').addEventListener('change', onDriverChange);
   $('#stAddition').addEventListener('input', function () { stAdvancedDirty = true; });
   $('#stSave').onclick = saveStorage;
@@ -2029,7 +2113,6 @@ function bindUi() {
     b.onclick = function () { $('#' + b.dataset.close).hidden = true; };
   });
 
-  $('#btnUpload').onclick = pickAndUpload;
   $('#filePicker').addEventListener('change', function (e) {
     uploadFiles(e.target.files);
     e.target.value = '';
