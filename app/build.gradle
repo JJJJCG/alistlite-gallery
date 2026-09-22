@@ -14,12 +14,13 @@ android {
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         setProperty("archivesBaseName", "AListLite-v${versionName}")
     }
+    // 只出 arm64-v8a 一个包：绝大多数现代手机都是这个架构，单包体积也小得多
     splits {
         abi {
             enable true
             reset()
-            include 'x86', 'armeabi-v7a', 'x86_64', 'arm64-v8a'
-            universalApk true
+            include 'arm64-v8a'
+            universalApk false
         }
     }
     buildTypes {
