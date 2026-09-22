@@ -121,6 +121,10 @@ window.addEventListener('error', function (e) {
 
     <!-- 只在「全部」（时间轴）视图出现：明确写出扫描范围和深度，避免误扫整个存储 -->
     <span class="mini only-all" id="scanScope"></span>
+    <div class="seg only-all" id="segLayout" title="排版方式">
+      <button data-layout="timeline">时间轴</button>
+      <button data-layout="flat">平铺</button>
+    </div>
     <button class="btn ghost small only-all" id="btnScopeRoot">改为扫全部挂载</button>
     <label class="mini only-all">深度
       <select id="depthSel">

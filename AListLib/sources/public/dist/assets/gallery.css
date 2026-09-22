@@ -236,7 +236,8 @@ a { color: inherit; text-decoration: none; }
   font-size: 14px;
   color: var(--text-2);
 }
-.seg { display: inline-flex; padding: 3px; border-radius: 999px; background: var(--border-2); }
+.seg { display: inline-flex; padding: 3px; border-radius: 999px; background: var(--border-2); flex: none; }
+.seg button { white-space: nowrap; }
 
 /* 「扫描范围 / 深度」只在全部（时间轴）视图出现。
    注意 .mini 也设了 display，同优先级时后定义的会赢，所以这里必须加 !important。

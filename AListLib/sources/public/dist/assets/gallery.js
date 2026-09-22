@@ -36,6 +36,7 @@ var LS_KIND = 'alistlite.kind';
 var LS_SORT = 'alistlite.sort';
 var LS_ROW = 'alistlite.row';
 var LS_DEPTH = 'alistlite.depth';
+var LS_LAYOUT = 'alistlite.layout';   // 「全部」视图排版：timeline（按日期分组）| flat（平铺全部）
 
 var SCAN_MAX_DIRS = 4000;     // 兜底上限，防止范围设错时无限扫下去
 var SCAN_CONCURRENCY = 5;     // 同时请求的目录数
@@ -49,6 +50,7 @@ var state = {
   browsePath: '/',         // 最近一次浏览的文件夹，「全部」默认扫它
   scanScope: '/',          // 本次扫描的起点目录
   scanDepth: 3,            // 扫描深度，0 表示不限层级
+  layout: 'timeline',      // 「全部」视图排版：timeline | flat
   items: [],               // 当前视图的媒体
   folders: [],             // 当前文件夹的子文件夹
   rawCount: 0,             // 当前文件夹接口返回的原始条目数（含非媒体）
@@ -663,7 +665,8 @@ function scanAll() {
   renderScanScope();
   markTreeActive();
   var grid = $('#grid');
-  grid.classList.remove('flat');
+  if (state.layout === 'flat') grid.classList.add('flat');
+  else grid.classList.remove('flat');
   grid.innerHTML = '';
   $('#albums').innerHTML = '';
 
@@ -737,7 +740,9 @@ function scanAll() {
           }
         });
         if (added.length) {
-          appendTimeline(added, live);   // 边扫边出图，不整块重绘，避免缩略图反复闪烁
+          // 边扫边出图，不整块重绘，避免缩略图反复闪烁
+          if (state.layout === 'flat') appendFlat(added);
+          else appendTimeline(added, live);
         }
         setProgress(
           '扫描 ' + root + '：已查 ' + state.scan.dirs + ' 个目录，找到 ' + state.scan.media + ' 个媒体' +
@@ -765,7 +770,10 @@ function scanAll() {
 function render() {
   var list = sortItems(filterItems(state.items));
   state.visible = list;
-  if (state.view === 'all') renderTimeline(list);
+  if (state.view === 'all') {
+    if (state.layout === 'flat') renderFlat(list);
+    else renderTimeline(list);
+  }
   else renderFolder(list);
 }
 
@@ -897,6 +905,25 @@ function renderTimeline(list) {
   });
 }
 
+/* 「全部」的平铺模式：不分日期、不分文件夹，所有媒体一个等高流 */
+function renderFlat(list) {
+  var grid = $('#grid');
+  grid.classList.add('flat');
+  grid.innerHTML = '';
+  $('#albums').innerHTML = '';
+  updateStat(list);
+  renderHead(null);
+
+  if (!list.length) {
+    if (state.scanning) return;
+    grid.appendChild(buildEmpty());
+    return;
+  }
+
+  list.forEach(function (it) { grid.appendChild(buildTile(it)); });
+  markLayout(grid);
+}
+
 function buildAlbumBlock(alb) {
   var block = el('div', 'album-block');
   var name = el('div', 'album-name', alb.label + ' · ' + alb.items.length);
@@ -910,7 +937,15 @@ function buildAlbumBlock(alb) {
   return block;
 }
 
-/** 扫描过程中增量插入：只新增节点，不重绘已有缩略图 */
+/** 扫描过程中增量插入（平铺模式）：全部媒体直接进 #grid 一个流 */
+function appendFlat(items) {
+  var grid = $('#grid');
+  items.forEach(function (it) { grid.appendChild(buildTile(it)); });
+  markLayout(grid);
+  updateStat(state.items);
+}
+
+/** 扫描过程中增量插入（时间轴模式）：只新增节点，不重绘已有缩略图 */
 function appendTimeline(items, live) {
   var grid = $('#grid');
   if (!live || !live.albums) return render();
@@ -2152,6 +2187,17 @@ function bindUi() {
     renderScanScope();
     if (state.view === 'all') scanAll();   // 改了深度就按新设置重扫
   };
+  // 「全部」视图排版：时间轴 / 平铺。切换即按当前扫描范围重扫一次，保证结构一致。
+  $$('#segLayout button').forEach(function (b) {
+    b.setAttribute('data-active', String(b.dataset.layout === state.layout));
+    b.onclick = function () {
+      if (state.layout === b.dataset.layout) return;
+      state.layout = b.dataset.layout;
+      try { localStorage.setItem(LS_LAYOUT, state.layout); } catch (e) { /* ignore */ }
+      $$('#segLayout button').forEach(function (x) { x.setAttribute('data-active', String(x === b)); });
+      if (state.view === 'all') scanAll();
+    };
+  });
   $('#btnScopeRoot').onclick = function () {
     state.scanScope = '/';
     renderScanScope();
@@ -2252,6 +2298,8 @@ function boot() {
     var dRaw = localStorage.getItem(LS_DEPTH);
     var dp = (dRaw === null || dRaw === '') ? NaN : Number(dRaw);
     state.scanDepth = (isFinite(dp) && dp >= 0 && dp <= 12) ? dp : 3;
+    var layRaw = localStorage.getItem(LS_LAYOUT);
+    state.layout = (layRaw === 'flat' || layRaw === 'timeline') ? layRaw : 'timeline';
     var last = localStorage.getItem(LS_PATH) || '/';
     state.browsePath = last;
     state.path = last;
