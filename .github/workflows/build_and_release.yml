@@ -32,8 +32,6 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
           cache: gradle
-          android-sdk-build-tools-version: '30.0.2'
-          android-sdk-platforms: 'android-34'
 
       - name: 4-GetLatestTag
         id: get_latest_tag
@@ -98,10 +96,11 @@ jobs:
       - name: 10-BuildAPK
         run: ./gradlew assembleRelease -q
 
-      - name: 11-SetupAndroidSDK
-        uses: android-actions/setup-android@v3
-
-      - name: 12-SignAPK
+      # 注意：不要在此处再插入 android-actions/setup-android。
+      # 该 action 会执行 sdkmanager 安装默认包（含已被移除的 "tools" 包），
+      # 在 ubuntu-latest 上必然以 exit 1 失败。Runner 镜像已预装 Android SDK，
+      # 上一步 assembleRelease 能成功也证明 SDK 可正常使用。
+      - name: 11-SignAPK
         run: |
           set -e
           OUT=app/build/outputs/apk/release
@@ -124,7 +123,20 @@ jobs:
             fi
             KS_PASS=android; KEY_PASS=android; KS_ALIAS=androiddebugkey
           fi
-          BT="$(ls "$SDK/build-tools" | sort -V | tail -n 1)"
+          # 定位 build-tools（apksigner 所在目录）。Runner 镜像通常已预装，
+          # 万一缺失则尝试用 sdkmanager 补装，并显式接受许可（避免交互式提示导致失败）。
+          if [ ! -d "$SDK/build-tools" ] || [ -z "$(ls -A "$SDK/build-tools" 2>/dev/null)" ]; then
+            echo "::warning::未找到 build-tools，尝试安装"
+            SDKMAN="$(find "$SDK/cmdline-tools" -name sdkmanager -type f 2>/dev/null | sort -V | tail -n 1)"
+            if [ -n "$SDKMAN" ]; then
+              yes | "$SDKMAN" --sdk_root="$SDK" "build-tools;34.0.0" > /dev/null 2>&1 || true
+            fi
+          fi
+          BT="$(ls "$SDK/build-tools" 2>/dev/null | sort -V | tail -n 1)"
+          if [ -z "$BT" ]; then
+            echo "::error::找不到 build-tools，无法签名（SDK=$SDK）"
+            exit 1
+          fi
           echo "使用 build-tools: $BT"
           shopt -s nullglob
           for f in "$OUT"/*.apk; do
@@ -139,7 +151,7 @@ jobs:
           done
           ls -la "$OUT"
 
-      - name: 13-CreateNewTag
+      - name: 12-CreateNewTag
         run: |
           git config --global user.email "2867555086@github.com"
           git config --global user.name "LeoHaoVIP"
@@ -149,7 +161,7 @@ jobs:
             git push origin ${{ env.NEW_TAG }}
           fi
 
-      - name: 14-CreateNewRelease
+      - name: 13-CreateNewRelease
         uses: softprops/action-gh-release@v2
         with:
           draft: false
