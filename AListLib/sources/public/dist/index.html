@@ -78,6 +78,10 @@ window.CONFIG = { base_path: undefined, cdn: undefined, main_color: undefined };
   </div>
   <div class="side-group side-foot">
     <ul class="menu">
+      <li><button id="navAccount" class="menu-btn" data-active="false">
+        <span class="mi" style="background:#fbcd78">
+          <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="9" r="3.4"/><path d="M5.4 19.6c1.3-3.1 3.8-4.6 6.6-4.6s5.3 1.5 6.6 4.6"/></svg>
+        </span><span class="ml" id="accountLabel">账号</span></button></li>
       <li><button id="navSettings" class="menu-btn" data-active="false">
         <span class="mi" style="background:#aacbd0">
           <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 3v2.2M12 18.8V21M4.2 7.5l1.9 1.1M17.9 15.4l1.9 1.1M4.2 16.5l1.9-1.1M17.9 8.6l1.9-1.1"/></svg>
@@ -193,18 +197,26 @@ window.CONFIG = { base_path: undefined, cdn: undefined, main_color: undefined };
   </div>
 </div>
 
-<!-- 登录 -->
+<!-- 账号：App 内置页面走本机地址，默认免密即为管理员，这里主要给局域网访问时用 -->
 <div id="login" class="sheet" hidden>
   <div class="sheet-card narrow">
-    <div class="sheet-head"><b>登录</b><button class="icon-btn" data-close="login">✕</button></div>
+    <div class="sheet-head"><b>账号</b><button class="icon-btn" data-close="login">✕</button></div>
     <div class="sheet-body">
-      <div class="form">
+      <div id="loginState" class="state-box">检测中…</div>
+      <div class="hint" style="margin-top:10px">
+        在 App 里打开时走本机地址（127.0.0.1），默认免密且就是管理员，通常不用登录。
+        只有用别的设备通过局域网 IP 访问、或想以非管理员身份访问时，才需要在下面填写账号密码。
+      </div>
+      <div class="form" style="margin-top:14px">
         <label>用户名 <input id="loginUser" autocomplete="username"></label>
         <label>密码 <input id="loginPass" type="password" autocomplete="current-password"></label>
       </div>
       <div class="hint" id="loginMsg"></div>
     </div>
-    <div class="sheet-foot"><button class="btn primary" id="loginBtn">登录</button></div>
+    <div class="sheet-foot">
+      <button class="btn ghost" id="loginLogout">清除登录状态</button>
+      <button class="btn primary" id="loginBtn">登录</button>
+    </div>
   </div>
 </div>
 

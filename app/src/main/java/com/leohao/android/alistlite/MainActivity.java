@@ -223,19 +223,20 @@ public class MainActivity extends AppCompatActivity implements OnMenuActionListe
     }
 
     private void checkPermissions() {
+        // 只申请读取本地文件所必需的权限。
+        // 不再申请 POST_NOTIFICATIONS（通知）与 REQUEST_IGNORE_BATTERY_OPTIMIZATIONS（忽略电池优化），
+        // 这两项属于「后台运行」相关权限；缺省状态下服务照常运行，只是不会常驻通知栏。
         XXPermissions.with(this)
-                .permission(Permission.POST_NOTIFICATIONS)
                 .permission(Permission.MANAGE_EXTERNAL_STORAGE)
-                .permission(Permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
                 .request(new OnPermissionCallback() {
                     @Override
                     public void onGranted(@NonNull List<String> permissions, boolean allGranted) {
-                        if (!allGranted) showToast("部分权限未授予，软件可能无法正常运行");
+                        if (!allGranted) showToast("未授予文件访问权限，本地存储将无法读取");
                     }
 
                     @Override
                     public void onDenied(@NonNull List<String> permissions, boolean doNotAskAgain) {
-                        if (doNotAskAgain) showToast("请手动授予相关权限");
+                        if (doNotAskAgain) showToast("请手动授予文件访问权限");
                     }
                 });
     }

@@ -248,7 +248,7 @@ function requestOnce(path, opt, attempt) {
     if (qs) url += '?' + qs;
   }
   var init = { method: method, headers: {} };
-  if (state.token) init.headers['Authorization'] = state.token;
+  if (state.token && !opt.__noToken) init.headers['Authorization'] = state.token;
   if (opt.body !== undefined && method !== 'GET') {
     init.headers['Content-Type'] = 'application/json';
     init.body = JSON.stringify(opt.body);
@@ -264,6 +264,15 @@ function requestOnce(path, opt, attempt) {
 
   return fetch(url, init).then(function (res) {
     if (timer) clearTimeout(timer);
+    // token 失效（改过密码等）：清掉它再重试一次。本机访问免密即为管理员，
+    // 清掉 token 后即可恢复正常，不必再来一次登录。
+    if (res.status === 401 && state.token && !opt.__noToken && attempt < 2) {
+      setToken('');
+      var retryOpt = {};
+      for (var k in opt) retryOpt[k] = opt[k];
+      retryOpt.__noToken = true;
+      return requestOnce(path, retryOpt, attempt + 1);
+    }
     return res.text().then(function (text) {
       var data = null;
       try { data = JSON.parse(text); } catch (e) { /* 非 JSON */ }
@@ -351,11 +360,58 @@ function setToken(t) {
   } catch (e) { /* ignore */ }
 }
 
+/* ------------------------------------------------------------------ 账号
+ * App 内置页面通过 http://127.0.0.1:<port> 访问，后端对「本机且无 token」的请求
+ * 直接按管理员处理，所以正常使用完全不需要登录。
+ * 这里的账号面板主要给「用别的设备通过局域网 IP 访问」这种场景用。
+ */
+
+function setStateBox(box, cls, text) {
+  box.className = 'state-box' + (cls ? ' ' + cls : '');
+  box.innerHTML = '';
+  box.appendChild(el('span', 'dot'));
+  box.appendChild(el('span', null, text));
+}
+
+function roleName(role) {
+  return role === 2 ? '管理员' : (role === 1 ? '普通用户' : '访客');
+}
+
+function renderAccount() {
+  var me = state.me;
+  var label = $('#accountLabel');
+  if (label) label.textContent = me ? (me.username + ' · ' + roleName(me.role)) : '账号';
+  var box = $('#loginState');
+  if (!box) return;
+  if (me) {
+    var extra = state.token ? '已登录' : '本机免密';
+    setStateBox(box, me.role === 2 ? 'ok' : 'warn',
+      me.username + ' · ' + roleName(me.role) + '（' + extra + '）');
+  } else if (state.token) {
+    setStateBox(box, 'warn', '已保存登录凭据，但读取用户信息失败');
+  } else {
+    setStateBox(box, 'warn', '访客身份。用本机地址（App 内打开）访问时自动就是管理员。');
+  }
+}
+
 function openLogin(msg) {
   $('#login').hidden = false;
   $('#loginMsg').textContent = msg || '';
   $('#loginMsg').className = 'hint';
-  setTimeout(function () { $('#loginUser').focus(); }, 60);
+  renderAccount();
+  request('/me', { method: 'GET' }).then(function (me) {
+    state.me = me;
+    renderAccount();
+  }).catch(function () { /* 拿不到就按已有状态显示 */ });
+}
+
+function logout() {
+  setToken('');
+  state.me = null;
+  renderAccount();
+  toast('已清除登录状态');
+  refreshAll();
+  loadMeAndStorages();
 }
 
 function doLogin() {
@@ -375,6 +431,7 @@ function doLogin() {
       toast('登录成功');
       return refreshAll();
     })
+    .then(function () { return loadMeAndStorages(); })
     .catch(function (e) {
       $('#loginMsg').textContent = e.message;
       $('#loginMsg').className = 'hint err';
@@ -1473,8 +1530,8 @@ function runDiag() {
   body.appendChild(el('div', 'hint', '正在检测…'));
 
   var settingsP = request('/public/settings', { method: 'GET' }).catch(function (e) { return { __err: e }; });
-  var meP = state.token ? request('/me', { method: 'GET' }).catch(function (e) { return { __err: e }; }) : Promise.resolve(null);
-  var stP = state.token ? request('/admin/storage/list', { method: 'GET' }).catch(function (e) { return { __err: e }; }) : Promise.resolve(null);
+  var meP = request('/me', { method: 'GET' }).catch(function (e) { return { __err: e }; });
+  var stP = request('/admin/storage/list', { method: 'GET' }).catch(function (e) { return { __err: e }; });
 
   Promise.all([settingsP, meP, stP]).then(function (res) {
     var settings = res[0], me = res[1], storages = res[2];
@@ -1491,15 +1548,20 @@ function runDiag() {
     body.appendChild(row('文件前缀', MEDIA));
 
     body.appendChild(el('div', 'diag-sec', '登录状态'));
-    body.appendChild(row('本地 token', state.token ? '有（' + state.token.slice(0, 12) + '…）' : '无', state.token ? 'diag-ok' : 'diag-bad'));
+    body.appendChild(row('本地 token',
+      state.token ? '有（' + state.token.slice(0, 12) + '…）' : '无（本机访问免密）',
+      state.token ? 'diag-ok' : ''));
     if (me && me.__err) {
       body.appendChild(row('/api/me', me.__err.message + (me.__err.status ? '（HTTP ' + me.__err.status + '）' : ''), 'diag-bad'));
+      body.appendChild(el('div', 'hint', '若是从别的设备用局域网地址打开，属正常（那个来源是访客）；在 App 内打开则应为管理员。'));
     } else if (!me) {
-      body.appendChild(row('/api/me', '未请求（没有 token）', 'diag-bad'));
+      body.appendChild(row('/api/me', '未取到返回', 'diag-bad'));
     } else {
       body.appendChild(row('用户名', me.username || '-'));
-      var roleName = me.role === 2 ? '管理员' : (me.role === 1 ? '普通用户' : '访客');
-      body.appendChild(row('角色', roleName + '（role=' + me.role + '）', me.role === 0 ? 'diag-bad' : 'diag-ok'));
+      var isAdmin = me.role === 2;
+      body.appendChild(row('角色',
+        roleName(me.role) + '（role=' + me.role + '）' + (!state.token && isAdmin ? ' · 本机免密' : ''),
+        isAdmin ? 'diag-ok' : 'diag-bad'));
       if (me.base_path && me.base_path !== '/') body.appendChild(row('用户根目录', me.base_path));
       if (me.disabled) body.appendChild(row('账号状态', '已禁用', 'diag-bad'));
     }
@@ -1746,11 +1808,11 @@ function closeSidebar() {
 /* ------------------------------------------------------------------ 启动 */
 
 function loadMeAndStorages() {
-  if (!state.token) {
-    return Promise.resolve(null);
-  }
+  // 不管有没有 token 都问一次 /api/me：本机访问时后端会直接按管理员返回，
+  // 这样界面上能正确显示「管理员（本机免密）」。
   return request('/me', { method: 'GET' }).then(function (me) {
     state.me = me;
+    renderAccount();
     return request('/admin/storage/list', { method: 'GET' }).then(function (data) {
       var list = (data && data.content) || [];
       diag.storages = list;
@@ -1762,9 +1824,12 @@ function loadMeAndStorages() {
       return list;
     }).catch(function () { return null; });
   }).catch(function (e) {
+    state.me = null;
+    renderAccount();
     if (isAuthError(e)) {
-      setToken('');
-      showBanner('warn', '登录已失效，请重新登录。', [{ label: '登录', onClick: function () { openLogin(); } }]);
+      showBanner('warn', '当前是访客身份，无法配置。若用局域网地址访问，请点右下角「账号」登录；用 App 内打开则自动是管理员。', [
+        { label: '账号', onClick: function () { openLogin(); } },
+      ]);
     }
     return null;
   });
@@ -1772,6 +1837,7 @@ function loadMeAndStorages() {
 
 function bindUi() {
   $('#navAll').onclick = function () { goAll(); closeSidebar(); };
+  $('#navAccount').onclick = function () { openLogin(); closeSidebar(); };
   $('#navSettings').onclick = function () { openAdmin(); closeSidebar(); };
   $('#btnAdmin').onclick = openAdmin;
   $('#btnMenu').onclick = openSidebar;
@@ -1779,13 +1845,14 @@ function bindUi() {
   $('#btnDiag').onclick = showDiag;
   $('#diagRerun').onclick = runDiag;
   $('#diagLogout').onclick = function () {
-    setToken('');
-    state.me = null;
     $('#diag').hidden = true;
-    showBanner('warn', '已退出登录。', [{ label: '登录', onClick: function () { openLogin(); } }]);
-    refreshAll();
+    logout();
   };
   $('#loginBtn').onclick = doLogin;
+  $('#loginLogout').onclick = function () {
+    logout();
+    $('#login').hidden = true;
+  };
   $('#loginPass').addEventListener('keydown', function (e) { if (e.key === 'Enter') doLogin(); });
   $('#stDriver').addEventListener('change', onDriverChange);
   $('#stSchemaBtn').onclick = showSchema;
@@ -1934,6 +2001,7 @@ function boot() {
   });
 
   bindUi();
+  renderAccount();
 
   if (!location.hash) {
     // 首次进入默认落在「全部」，让用户马上看到东西；hashchange 会负责触发加载
