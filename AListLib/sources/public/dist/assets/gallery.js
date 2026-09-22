@@ -470,82 +470,45 @@ function toMedia(o, parent) {
   };
 }
 
-/* ------------------------------------------------------------------ 侧栏文件夹树 */
+/* ------------------------------------------------------------------ 侧栏：只列挂载点
+ * 不再展示从 / 展开的整棵文件夹树 —— 那样会把存储里所有目录都铺出来，
+ * 逻辑又重又乱。侧边栏只显示「用户自己挂载了哪些存储」，目录的浏览交给主区域
+ * 的文件夹卡片（每个挂载点进去一层一层看）。
+ */
 
-var treeCache = {};
-
-function buildTreeRow(path, name, depth) {
-  var wrap = el('div');
-  var row = el('div', 'tree-row');
-  var caret = el('button', 'tree-caret');
-  caret.type = 'button';
-  caret.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>';
-  var label = el('span', 'tree-name', name);
-  var kids = el('div', 'tree-children');
-  kids.hidden = true;
-  row.appendChild(caret);
-  row.appendChild(label);
-  wrap.appendChild(row);
-  wrap.appendChild(kids);
-
-  var loaded = false;
-  function toggle(force) {
-    var open = force !== undefined ? force : kids.hidden;
-    if (open === !kids.hidden) return Promise.resolve();
-    kids.hidden = !open;
-    caret.classList.toggle('open', open);
-    if (!open || loaded) return Promise.resolve();
-    loaded = true;
-    kids.appendChild(el('div', 'tree-msg', '读取中…'));
-    return loadChildren().then(function () {
-      kids.innerHTML = '';
-      var list = treeCache[path] || [];
-      if (!list.length) {
-        kids.appendChild(el('div', 'tree-msg', '没有子文件夹'));
-        caret.classList.add('leaf');
-        return;
-      }
-      list.forEach(function (d) {
-        kids.appendChild(buildTreeRow(joinPath(path, d.name), d.name, depth + 1));
-      });
-    }).catch(function (e) {
-      kids.innerHTML = '';
-      var m = el('div', 'tree-msg', e.message);
-      m.style.color = 'var(--danger)';
-      kids.appendChild(m);
-      loaded = false;
-    });
-  }
-
-  function loadChildren() {
-    if (treeCache[path]) return Promise.resolve(treeCache[path]);
-    return listDirs(path).then(function (data) {
-      var list = (data || []).slice().sort(function (a, b) {
-        return String(a.name).localeCompare(String(b.name), 'zh-CN', { numeric: true });
-      });
-      treeCache[path] = list;
-      return list;
-    });
-  }
-
-  caret.addEventListener('click', function (ev) { ev.stopPropagation(); toggle(); });
-  row.addEventListener('click', function () {
-    goFolder(path);
-    // 点名字同时也展开，省得必须去点那个小三角
-    toggle(true);
-    closeSidebar();
-  });
-  return wrap;
-}
-
-function renderTree() {
+function renderMounts() {
   var box = $('#tree');
+  if (!box) return Promise.resolve();
   box.innerHTML = '';
-  var root = buildTreeRow('/', '根目录', 0);
-  box.appendChild(root);
-  // 自动展开根目录，让用户一进来看得到文件夹（这是之前「什么都看不到」的主因之一）
-  var caret = root.querySelector('.tree-caret');
-  if (caret) caret.click();
+  box.appendChild(el('div', 'tree-msg', '读取挂载点…'));
+  return listDirs('/').then(function (dirs) {
+    box.innerHTML = '';
+    var list = (dirs || []).slice().sort(function (a, b) {
+      return String(a.name).localeCompare(String(b.name), 'zh-CN', { numeric: true });
+    });
+    if (!list.length) {
+      var m = el('div', 'tree-msg', '还没有挂载任何存储。');
+      box.appendChild(m);
+      var b = el('button', 'btn ghost small', '去挂载管理添加');
+      b.style.marginTop = '8px';
+      b.onclick = function () { openAdmin(); closeSidebar(); };
+      box.appendChild(b);
+      return;
+    }
+    list.forEach(function (d) {
+      var p = joinPath('/', d.name);
+      var row = el('div', 'tree-row');
+      row.title = p;
+      row.appendChild(el('span', 'tree-name', d.name));
+      row.onclick = function () { goFolder(p); closeSidebar(); };
+      box.appendChild(row);
+    });
+  }).catch(function (e) {
+    box.innerHTML = '';
+    var m = el('div', 'tree-msg', '读取挂载点失败：' + e.message);
+    m.style.color = 'var(--danger)';
+    box.appendChild(m);
+  });
 }
 
 function markTreeActive() {
@@ -555,11 +518,13 @@ function markTreeActive() {
     $('#navAll').setAttribute('data-active', 'true');
     return;
   }
+  // 当前浏览路径属于哪个挂载点，就把哪个挂载点标成选中
+  var p = String(state.path || '/');
+  var parts = p.split('/').filter(Boolean);
+  var first = parts.length ? '/' + parts[0] : '';
   $$('#tree .tree-row').forEach(function (r) {
     var name = r.querySelector('.tree-name');
-    if (name && name.textContent === (state.path === '/' ? '根目录' : baseName(state.path))) {
-      r.classList.add('active');
-    }
+    if (name && first && ('/' + name.textContent) === first) r.classList.add('active');
   });
 }
 
@@ -632,7 +597,6 @@ function refreshAll() {
 /* ------------------------------------------------------------------ 加载：单个文件夹 */
 
 function loadFolder(path) {
-  treeCache = treeCache || {};
   state.items = [];
   state.folders = [];
   state.rawCount = 0;
@@ -1027,9 +991,10 @@ function buildAlbumBox(folder) {
   box.appendChild(el('p', null, folder.name));
   box.onclick = function () { goFolder(folder.path); };
 
-  // 封面用该文件夹里的第一张图；没有就向上找一层子文件夹，再没有就保留文件夹图标
+  // 封面用该文件夹里的第一张图；没有就一层层往下找（典型结构：/本地存储/DCIM/Camera/xx.jpg，
+  // 要下探两层才能碰到图）。再没有就保留文件夹图标。
   if (!folder.path) return box;
-  loadCover(folder.path, 2).then(function (item) {
+  loadCover(folder.path, 3).then(function (item) {
     if (!item) { ph.classList.remove('pulse'); return; }
     img.onload = function () { img.classList.add('ready'); ph.remove(); };
     img.onerror = function () { ph.classList.remove('pulse'); };
@@ -1296,6 +1261,19 @@ function buildEmpty() {
     box.appendChild(acts);
   } else {
     if (state.folders.length) box.classList.add('compact');
+    // 根目录下什么都没有，多半是一个挂载都还没加
+    if (state.path === '/' && !state.folders.length && !state.items.length && !state.rawCount) {
+      box.innerHTML = '<b>还没有挂载任何存储</b>';
+      var h0 = el('div', 'hint', '先去添加一个挂载，指到你放照片的目录（比如 /storage/emulated/0/DCIM），这里就会出现对应的文件夹。');
+      box.appendChild(h0);
+      var a0 = el('div');
+      a0.style.marginTop = '14px';
+      var bm = el('button', 'btn primary small', '去挂载管理');
+      bm.onclick = openAdmin;
+      a0.appendChild(bm);
+      box.appendChild(a0);
+      return box;
+    }
     box.innerHTML = '<b>这个文件夹里没有图片或视频</b>';
     var h2 = el('div', 'hint');
     var nonMedia = state.rawCount - state.items.length - state.folders.length;
@@ -1749,7 +1727,14 @@ function refreshStorages() {
       acts.appendChild(bEdit); acts.appendChild(bToggle); acts.appendChild(bDel);
       top.appendChild(acts);
       item.appendChild(top);
-      var sub = el('div', 'sub', '顺序 ' + (s.order || 0) + (s.addition ? ' · ' + s.addition : ''));
+      // 把「这个挂载实际指向哪里」直接亮出来，用户不用去猜 addition 里的 JSON
+      var rootTxt = '';
+      try {
+        var ad = JSON.parse(s.addition || '{}');
+        rootTxt = ad.root_folder_path || ad.root_folder_id || '';
+      } catch (e2) { /* addition 不是 JSON 就不显示 */ }
+      var sub = el('div', 'sub',
+        '顺序 ' + (s.order || 0) + (rootTxt ? ' · 根目录 ' + rootTxt : ''));
       item.appendChild(sub);
       box.appendChild(item);
     });
@@ -1798,9 +1783,10 @@ function saveStorage() {
   } else {
     addition = '{}';
   }
+  var mount = ($('#stMount').value.trim() || '/');
   var payload = {
     id: editingId || undefined,
-    mount_path: ($('#stMount').value.trim() || '/'),
+    mount_path: mount,
     order: Number($('#stOrder').value || 0),
     driver: driver,
     addition: addition,
@@ -1808,18 +1794,44 @@ function saveStorage() {
     disabled: false,
     remark: '',
   };
-  var path = editingId ? '/admin/storage/update' : '/admin/storage/create';
-  request(path, { body: payload }).then(function () {
+  var url = editingId ? '/admin/storage/update' : '/admin/storage/create';
+
+  function afterSave() {
     toast(editingId ? '已保存' : '已添加');
     editingId = 0;
     $('#stFormTitle').textContent = '新增挂载';
     refreshStorages();
     loadMeAndStorages();
-    treeCache = {};
-    renderTree();
-  }).catch(function (e) {
-    toast('保存失败：' + e.message, 4000);
-  });
+    renderMounts();
+  }
+
+  function submit() {
+    request(url, { body: payload }).then(afterSave).catch(function (e) {
+      var msg = (e && e.message) || '';
+      // 数据库的唯一约束报错对用户没有任何信息量，翻译成人话
+      if (/unique|constraint/i.test(msg)) {
+        msg = '挂载路径「' + mount + '」已经存在 —— 每个挂载的路径必须唯一。' +
+              '如果想改它的根目录，请在上方列表里点「编辑」，不要新增。';
+      }
+      toast('保存失败：' + msg, 7000);
+    });
+  }
+
+  if (editingId) { submit(); return; }
+
+  // 新增前先查重：同一路径挂两次只会得到一句看不懂的 UNIQUE constraint failed
+  request('/admin/storage/list', { method: 'GET' }).then(function (data) {
+    var list = (data && data.content) || [];
+    var dup = null;
+    list.forEach(function (s) { if ((s.mount_path || '/') === mount) dup = s; });
+    if (dup) {
+      toast('挂载路径「' + mount + '」已经存在（' + (dup.driver || '?') + '）。' +
+            '要改它的根目录，请在上方列表点「编辑」。', 7000);
+      return null;
+    }
+    submit();
+    return null;
+  }).catch(function () { submit(); });   // 列表拿不到就直接提交，让后端给结论
 }
 
 function showSchema() {
@@ -1936,7 +1948,7 @@ function bindUi() {
   });
 
   $('#btnRefresh').onclick = function () {
-    treeCache = {};
+    renderMounts();
     refreshAll();
   };
 
@@ -2116,7 +2128,7 @@ function boot() {
   }).catch(function () { /* 站点信息拿不到不影响使用 */ });
 
   loadMeAndStorages();
-  renderTree();
+  renderMounts();
 
   setTimeout(function () {
     var boot = $('#boot');

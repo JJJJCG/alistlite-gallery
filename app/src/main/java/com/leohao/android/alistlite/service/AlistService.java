@@ -84,15 +84,17 @@ public class AlistService extends Service {
                     //判断 AList 是否为首次初始化
                     boolean hasInitialized = AppUtil.checkAlistHasInitialized();
                     if (!hasInitialized) {
-                        //挂载本地存储
-                        alistServer.addLocalStorageDriver(Environment.getExternalStorageDirectory().getAbsolutePath(), Constants.ALIST_STORAGE_DRIVER_MOUNT_PATH);
-                        //初始化密码
+                        // 初始化密码（保留：供 App 菜单里的「一键登录」与局域网访问使用）
                         alistServer.setAdminPassword(Constants.ALIST_DEFAULT_PASSWORD);
                         // 持久化存储默认密码，供一键登录使用
                         SharedDataHelper.getInstance().putSharedData(Constants.ANDROID_SHARED_DATA_KEY_ADMIN_PASSWORD, Constants.ALIST_DEFAULT_PASSWORD);
-                        //管理员用户名
+                        // 管理员用户名
                         String adminUsername = alistServer.getAdminUser();
                         showToast(String.format("初始登录信息：%s | %s", adminUsername, Constants.ALIST_DEFAULT_PASSWORD), Toast.LENGTH_LONG);
+                        // 注意：不再默认挂载本地存储。
+                        // 以前这里会自动把 Environment.getExternalStorageDirectory()（也就是整块内部存储）
+                        // 挂到 /本地存储，导致「扫描挂载目录」等于扫描全盘。现在挂载完全由用户
+                        // 在网页端的「挂载管理」里自己添加，想挂哪个目录就挂哪个目录。
                     }
                     justStarted = true;
                 }
