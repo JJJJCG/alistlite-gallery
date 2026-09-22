@@ -1515,12 +1515,19 @@ function runDiag() {
         body.appendChild(el('div', 'hint', '没有任何挂载，所以看不到文件。点右上角齿轮（挂载管理）添加一个「本地存储」，根目录一般填 /storage/emulated/0。'));
       } else {
         body.appendChild(row('数量', list.length + ' 个'));
+        var hasLocal = false;
         list.sort(function (a, b) { return (a.order || 0) - (b.order || 0); }).forEach(function (s) {
+          if (s.driver === 'Local') hasLocal = true;
           var txt = (s.mount_path || '/') + '  ·  ' + (s.driver || '?') +
             (s.disabled ? '  ·  已停用' : '  ·  ' + (s.status || 'work')) +
             (s.enable_sign ? '  ·  签名开启' : '');
           body.appendChild(row('挂载', txt, s.disabled || s.status === 'error' ? 'diag-bad' : 'diag-ok'));
         });
+        if (hasLocal) {
+          body.appendChild(el('div', 'hint',
+            '提示：读本地目录报「permission denied」时，是系统没给本应用存储权限。' +
+            '请到 系统设置 → 应用 → AListLite → 权限，把「照片和视频 / 所有文件」打开后重试。'));
+        }
       }
     } else {
       body.appendChild(row('存储列表', '未登录，未请求', 'diag-bad'));
