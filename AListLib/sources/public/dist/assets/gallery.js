@@ -552,11 +552,9 @@ function goFolder(path) {
 }
 
 function goAll() {
-  // 在文件夹里点「全部」：扫的就是这个文件夹（不再是整个根目录）。
-  // 已经在「全部」里再点，则保持当前范围不变。
-  if (state.view === 'folder') {
-    state.scanScope = (state.browsePath && state.browsePath !== '/') ? state.browsePath : '/';
-  }
+  // 「全部」= 所有挂载的全部：默认从根目录起扫（所有挂载点都挂在根下）。
+  // 只想看某个文件夹的内容时，用筛选栏的「只扫当前文件夹」。
+  state.scanScope = '/';
   if (setHash('all', '/')) return;
   openAllNow();
 }
@@ -584,12 +582,15 @@ function openAllNow() {
 /** 把「扫哪儿、扫多深」摆在界面上，避免用户不知道点一下会扫什么 */
 function renderScanScope() {
   var el = $('#scanScope');
-  var btn = $('#btnScopeRoot');
+  var btnRoot = $('#btnScopeRoot');
+  var btnHere = $('#btnScopeHere');
   var d = state.scanDepth === 0 ? '全部层级' : state.scanDepth + ' 层';
-  if (el) el.textContent = '范围 ' + (state.scanScope || '/') + ' · ' + d;
-  // 已经在扫全部挂载时，这个按钮就没意义了（用类名而不是 hidden，
-  // 否则会被 .only-all 的 !important 规则盖掉）
-  if (btn) btn.classList.toggle('is-off', (state.scanScope || '/') === '/');
+  var isAll = (state.scanScope || '/') === '/';
+  if (el) el.textContent = (isAll ? '范围 全部挂载' : '范围 ' + state.scanScope) + ' · ' + d;
+  // 「改为扫全部挂载」只在局部扫描时显示；「只扫当前文件夹」只在扫全部挂载、
+  // 且当前确实在某个子文件夹里时显示（都用类名，避免被 .only-all 的 !important 盖掉）
+  if (btnRoot) btnRoot.classList.toggle('is-off', isAll);
+  if (btnHere) btnHere.classList.toggle('is-off', !isAll || !state.browsePath || state.browsePath === '/');
 }
 
 function refreshAll() {
@@ -2203,6 +2204,12 @@ function bindUi() {
     renderScanScope();
     scanAll();
   };
+  $('#btnScopeHere').onclick = function () {
+    // 「只扫当前文件夹」：以最近浏览的文件夹为根做一次局部扫描
+    state.scanScope = state.browsePath || '/';
+    renderScanScope();
+    scanAll();
+  };
 
   var kwTimer = null;
   $('#searchInput').addEventListener('input', function (e) {
@@ -2323,7 +2330,7 @@ function boot() {
   } else {
     var p0 = parseHash();
     if (p0.view === 'all') {
-      state.scanScope = state.browsePath || '/';
+      state.scanScope = '/';   // 「全部」默认扫全部挂载
       openAllNow();
     } else {
       openFolderNow(p0.path);
