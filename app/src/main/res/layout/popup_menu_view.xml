@@ -1,0 +1,290 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+             android:layout_width="wrap_content"
+             android:layout_height="wrap_content"
+             android:fitsSystemWindows="true">
+
+    <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scrollbars="none"
+            android:fillViewport="false">
+
+        <LinearLayout
+                android:paddingTop="4dp"
+                android:paddingBottom="4dp"
+                android:orientation="vertical"
+                android:background="@drawable/popup_menu_border"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:elevation="8dp">
+
+            <!-- 服务管理 分组 -->
+            <TextView
+                    android:id="@+id/menu_section_service"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp"
+                    android:paddingTop="4dp"
+                    android:paddingBottom="2dp"
+                    android:text="服务管理"
+                    android:textSize="11sp"
+                    android:textColor="@color/ios_text_secondary"
+                    android:fontFamily="sans-serif-medium"
+                    android:letterSpacing="0.05"/>
+
+            <TextView
+                    android:id="@+id/btn_showQrCode"
+                    android:drawableStart="@drawable/ic_menu_qrcode"
+                    android:drawablePadding="12dp"
+                    android:focusable="true"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp"
+                    android:paddingTop="11dp"
+                    android:paddingBottom="11dp"
+                    android:textSize="15sp"
+                    android:textColor="@color/menu_text_color"
+                    android:fontFamily="sans-serif"
+                    android:clickable="true"
+                    android:background="?attr/selectableItemBackground"
+                    android:text="@string/popup_menu_item_qrcode"/>
+
+            <TextView
+                    android:id="@+id/btn_openInBrowser"
+                    android:drawableStart="@drawable/ic_menu_browser"
+                    android:drawablePadding="12dp"
+                    android:focusable="true"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp"
+                    android:paddingTop="11dp"
+                    android:paddingBottom="11dp"
+                    android:textSize="15sp"
+                    android:textColor="@color/menu_text_color"
+                    android:fontFamily="sans-serif"
+                    android:clickable="true"
+                    android:background="?attr/selectableItemBackground"
+                    android:text="@string/popup_menu_item_open_browser"/>
+
+            <TextView
+                    android:id="@+id/btn_serviceLogs"
+                    android:drawableStart="@drawable/ic_menu_logs"
+                    android:drawablePadding="12dp"
+                    android:focusable="true"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp"
+                    android:paddingTop="11dp"
+                    android:paddingBottom="11dp"
+                    android:textSize="15sp"
+                    android:textColor="@color/menu_text_color"
+                    android:fontFamily="sans-serif"
+                    android:clickable="true"
+                    android:background="?attr/selectableItemBackground"
+                    android:text="@string/popup_menu_item_service_logs"/>
+
+            <!-- 分割线 -->
+            <View
+                    android:layout_width="match_parent"
+                    android:layout_height="0.5dp"
+                    android:layout_marginStart="16dp"
+                    android:layout_marginEnd="16dp"
+                    android:layout_marginTop="2dp"
+                    android:layout_marginBottom="2dp"
+                    android:background="@color/ios_separator"/>
+
+            <!-- 安全设置 分组 -->
+            <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp"
+                    android:paddingTop="4dp"
+                    android:paddingBottom="2dp"
+                    android:text="安全设置"
+                    android:textSize="11sp"
+                    android:textColor="@color/ios_text_secondary"
+                    android:fontFamily="sans-serif-medium"
+                    android:letterSpacing="0.05"/>
+
+            <TextView
+                    android:id="@+id/btn_oneClickLogin"
+                    android:drawableStart="@drawable/ic_menu_login"
+                    android:drawablePadding="12dp"
+                    android:focusable="true"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp"
+                    android:paddingTop="11dp"
+                    android:paddingBottom="11dp"
+                    android:textSize="15sp"
+                    android:textColor="@color/menu_text_color"
+                    android:fontFamily="sans-serif"
+                    android:clickable="true"
+                    android:background="?attr/selectableItemBackground"
+                    android:text="@string/popup_menu_item_one_click_login"/>
+
+            <TextView
+                    android:id="@+id/btn_setAdminPassword"
+                    android:drawableStart="@drawable/ic_menu_key"
+                    android:drawablePadding="12dp"
+                    android:focusable="true"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp"
+                    android:paddingTop="11dp"
+                    android:paddingBottom="11dp"
+                    android:textSize="15sp"
+                    android:textColor="@color/menu_text_color"
+                    android:fontFamily="sans-serif"
+                    android:clickable="true"
+                    android:background="?attr/selectableItemBackground"
+                    android:text="@string/popup_menu_item_password"/>
+
+            <TextView
+                    android:id="@+id/btn_toggleHttps"
+                    android:drawableStart="@drawable/ic_shortcut_https"
+                    android:drawablePadding="12dp"
+                    android:focusable="true"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp"
+                    android:paddingTop="11dp"
+                    android:paddingBottom="11dp"
+                    android:textSize="15sp"
+                    android:textColor="@color/menu_text_color"
+                    android:fontFamily="sans-serif"
+                    android:clickable="true"
+                    android:background="?attr/selectableItemBackground"
+                    android:text="@string/popup_menu_item_https"/>
+
+            <!-- 分割线 -->
+            <View
+                    android:layout_width="match_parent"
+                    android:layout_height="0.5dp"
+                    android:layout_marginStart="16dp"
+                    android:layout_marginEnd="16dp"
+                    android:layout_marginTop="2dp"
+                    android:layout_marginBottom="2dp"
+                    android:background="@color/ios_separator"/>
+
+            <!-- 系统配置 分组 -->
+            <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp"
+                    android:paddingTop="4dp"
+                    android:paddingBottom="2dp"
+                    android:text="系统配置"
+                    android:textSize="11sp"
+                    android:textColor="@color/ios_text_secondary"
+                    android:fontFamily="sans-serif-medium"
+                    android:letterSpacing="0.05"/>
+
+            <TextView
+                    android:id="@+id/btn_startPermissionCheckActivity"
+                    android:drawableStart="@drawable/ic_menu_permission"
+                    android:drawablePadding="12dp"
+                    android:focusable="true"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp"
+                    android:paddingTop="11dp"
+                    android:paddingBottom="11dp"
+                    android:textSize="15sp"
+                    android:textColor="@color/menu_text_color"
+                    android:fontFamily="sans-serif"
+                    android:clickable="true"
+                    android:background="?attr/selectableItemBackground"
+                    android:text="@string/popup_menu_item_permission"/>
+
+            <TextView
+                    android:id="@+id/btn_manageConfigData"
+                    android:drawableStart="@drawable/ic_menu_config"
+                    android:drawablePadding="12dp"
+                    android:focusable="true"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp"
+                    android:paddingTop="11dp"
+                    android:paddingBottom="11dp"
+                    android:textSize="15sp"
+                    android:textColor="@color/menu_text_color"
+                    android:fontFamily="sans-serif"
+                    android:clickable="true"
+                    android:background="?attr/selectableItemBackground"
+                    android:text="@string/popup_menu_item_advanced_config"/>
+
+            <!-- 分割线 -->
+            <View
+                    android:layout_width="match_parent"
+                    android:layout_height="0.5dp"
+                    android:layout_marginStart="16dp"
+                    android:layout_marginEnd="16dp"
+                    android:layout_marginTop="2dp"
+                    android:layout_marginBottom="2dp"
+                    android:background="@color/ios_separator"/>
+
+            <!-- 关于 分组 -->
+            <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp"
+                    android:paddingTop="4dp"
+                    android:paddingBottom="2dp"
+                    android:text="关于"
+                    android:textSize="11sp"
+                    android:textColor="@color/ios_text_secondary"
+                    android:fontFamily="sans-serif-medium"
+                    android:letterSpacing="0.05"/>
+
+            <TextView
+                    android:id="@+id/btn_checkUpdates"
+                    android:drawableStart="@drawable/refresh"
+                    android:drawablePadding="12dp"
+                    android:focusable="true"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp"
+                    android:paddingTop="11dp"
+                    android:paddingBottom="11dp"
+                    android:textSize="15sp"
+                    android:textColor="@color/menu_text_color"
+                    android:fontFamily="sans-serif"
+                    android:clickable="true"
+                    android:background="?attr/selectableItemBackground"
+                    android:text="@string/popup_menu_item_check_updates"/>
+
+            <TextView
+                    android:id="@+id/btn_showSystemInfo"
+                    android:drawableStart="@drawable/ic_menu_info"
+                    android:drawablePadding="12dp"
+                    android:focusable="true"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="16dp"
+                    android:paddingTop="11dp"
+                    android:paddingBottom="11dp"
+                    android:textSize="15sp"
+                    android:textColor="@color/menu_text_color"
+                    android:fontFamily="sans-serif"
+                    android:clickable="true"
+                    android:background="?attr/selectableItemBackground"
+                    android:text="@string/popup_menu_item_about"/>
+        </LinearLayout>
+    </ScrollView>
+</FrameLayout>

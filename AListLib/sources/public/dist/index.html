@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f6f7f9">
+<meta name="color-scheme" content="light dark">
+<title>图库</title>
+<link rel="manifest" href="/manifest.json">
+<link id="cssLink" rel="stylesheet" href="/assets/gallery.css">
+<style>
+  #boot { padding: 22vh 20px; text-align: center; color: #9aa1ac; font-size: 14px;
+          font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <header id="topbar">
+    <button class="icon-btn" id="btnSidebar" title="切换侧边栏">☰</button>
+    <div class="brand"><i></i><span>图库</span></div>
+    <input id="searchInput" type="text" placeholder="搜索文件名…" autocomplete="off">
+    <div class="spacer"></div>
+    <button class="icon-btn" id="btnUpload" title="上传到当前文件夹">↑ 上传</button>
+    <button class="icon-btn" id="btnDense" title="切换缩略图密度">▦</button>
+    <button class="icon-btn" id="btnRefresh" title="刷新">⟳</button>
+    <button class="icon-btn" id="btnAdmin" title="挂载管理">⚙</button>
+  </header>
+
+  <div id="body">
+    <aside id="sidebar">
+      <div class="side-title">浏览</div>
+      <div class="side-item" id="navAll">
+        <span class="tree-caret">◆</span><span class="label">全部媒体</span>
+      </div>
+      <div class="side-title">文件夹</div>
+      <div id="treeRoot"></div>
+    </aside>
+
+    <main id="main">
+      <div id="crumbs"></div>
+      <div id="toolbar">
+        <span class="chip active" data-kind="all">全部</span>
+        <span class="chip" data-kind="image">图片</span>
+        <span class="chip" data-kind="video">视频</span>
+        <select id="sortSel" class="chip" title="排序">
+          <option value="name">按名称</option>
+          <option value="modified">按时间</option>
+          <option value="size">按大小</option>
+        </select>
+        <select id="depthSel" class="chip" title="「全部媒体」的扫描深度">
+          <option value="1">扫描 1 层</option>
+          <option value="2">扫描 2 层</option>
+          <option value="3">扫描 3 层</option>
+          <option value="5">扫描 5 层</option>
+          <option value="-1">扫描全部层级</option>
+        </select>
+        <span id="stat"></span>
+      </div>
+      <div id="grid"></div>
+    </main>
+  </div>
+</div>
+
+<div id="viewer" hidden>
+  <div class="v-bar">
+    <span class="v-title" id="vTitle"></span>
+    <button class="icon-btn" id="vCopy" title="复制下载链接">🔗</button>
+    <a class="icon-btn" id="vOpen" target="_blank" rel="noopener" title="在新标签页打开">⧉</a>
+    <a class="icon-btn" id="vDownload" title="下载">↓</a>
+    <button class="icon-btn" id="vClose" title="关闭 (Esc)">✕</button>
+  </div>
+  <div class="v-stage" id="vStage">
+    <button class="nav prev" id="vPrev" title="上一个 (←)">‹</button>
+    <button class="nav next" id="vNext" title="下一个 (→)">›</button>
+  </div>
+</div>
+
+<div class="modal" id="login" hidden>
+  <div class="panel narrow">
+    <header>登录</header>
+    <div class="content">
+      <label class="field">
+        <span>用户名</span>
+        <input id="loginUser" type="text" value="admin" autocomplete="username">
+      </label>
+      <label class="field">
+        <span>密码</span>
+        <input id="loginPass" type="password" autocomplete="current-password">
+      </label>
+      <button class="btn block" id="loginBtn">登录</button>
+      <div id="loginMsg" style="color:var(--danger);font-size:12.5px;margin-top:10px;min-height:18px"></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="admin" hidden>
+  <div class="panel">
+    <header>
+      <span>挂载管理</span>
+      <div style="flex:1"></div>
+      <span id="whoami" style="font-size:12px;color:var(--text-3);font-weight:400"></span>
+      <button class="btn ghost" id="logoutBtn">退出登录</button>
+      <button class="icon-btn" id="adminClose">✕</button>
+    </header>
+    <div class="content">
+      <div id="adminList">
+        <div class="row" style="margin-bottom:12px">
+          <button class="btn" id="stNew">新增挂载</button>
+        </div>
+        <div id="storageList"></div>
+      </div>
+
+      <div id="stForm" hidden>
+        <div style="font-weight:500;margin-bottom:12px" id="stFormTitle">新增挂载</div>
+        <input type="hidden" id="stId">
+        <label class="field">
+          <span>显示名称</span>
+          <input id="stName" type="text" placeholder="例如：手机相册">
+        </label>
+        <label class="field">
+          <span>存储类型</span>
+          <select id="stDriver">
+            <option value="Local">本地存储</option>
+            <option value="SMB">SMB / Windows 共享</option>
+            <option value="SFTP">SFTP</option>
+            <option value="WebDAV">WebDAV</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>挂载路径</span>
+          <input id="stMount" type="text" value="/" placeholder="/ 或 /相册">
+        </label>
+        <label class="field">
+          <span>排序</span>
+          <input id="stOrder" type="number" value="0">
+        </label>
+        <div class="check"><input type="checkbox" id="stSign"><label for="stSign">开启签名（raw_url 带 sign，分享链接更安全）</label></div>
+        <div class="check"><input type="checkbox" id="stProxy"><label for="stProxy">Web 代理（服务端中转流量，不暴露直链）</label></div>
+        <label class="field">
+          <span>驱动配置（JSON）</span>
+          <textarea id="stAddition" spellcheck="false"></textarea>
+          <div class="hint" id="stDriverHint"></div>
+        </label>
+        <div class="row">
+          <button class="btn" id="stSave">保存</button>
+          <button class="btn ghost" id="stSchema">查看字段说明</button>
+          <button class="btn ghost" id="stCancel">返回列表</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="ctxMenu" hidden></div>
+<div id="toast"></div>
+<input type="file" id="filePicker" multiple hidden>
+<div id="boot">正在加载…</div>
+
+<script>
+/* 下面这个对象是给后端做字符串替换用的占位符，
+   server/static/static.go 的 initIndex() 会把 base_path / cdn 替换成真实值。
+   请不要改动键名与 "xxx: undefined" 的写法。 */
+window.CONFIG = { base_path: undefined, cdn: undefined };
+
+(function () {
+  var bp = (window.CONFIG && window.CONFIG.base_path ? window.CONFIG.base_path : '/').replace(/\/+$/, '');
+  document.getElementById('cssLink').href = bp + '/assets/gallery.css';
+  var s = document.createElement('script');
+  s.src = bp + '/assets/gallery.js';
+  s.onload = function () { var b = document.getElementById('boot'); if (b) b.remove(); };
+  s.onerror = function () {
+    document.getElementById('boot').textContent = '前端资源加载失败，请确认 assets/gallery.js 存在。';
+  };
+  document.body.appendChild(s);
+})();
+</script>
+</body>
+</html>

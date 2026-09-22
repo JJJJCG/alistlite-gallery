@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>About AListLite</title>
+    <style>
+        .contributor {
+            display: inline-block;
+            margin: 5px;
+            text-align: center;
+            line-height: 3px;
+            font-size: 12px;
+        }
+
+        .avatar {
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+        }
+
+        h4 {
+            line-height: 1.6em;
+        }
+
+        p {
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+<p align="center">
+    <a href="https://github.com/LeoHaoVIP/AListLiteAndroid" target="_blank" rel="noopener noreferrer"><img
+            width="80px" src="../images/alistlite.png"/>
+    </a>
+</p>
+<h3 align="center">AListLite | 在 Android 上一键启动 AList 服务</h3>
+<h4 align="center">AListLite 支持服务一键启动、状态栏磁贴、后台常驻、开机自启和高级配置等功能，界面简洁，上手简单。</h4>
+<p align="center">🔥“您的技能和经验对我们来说非常宝贵。加入我们的开源项目，一起创造有意义的影响吧！”</p>
+<p align="center">
+    <a href="https://github.com/LeoHaoVIP/AListLiteAndroid/releases" style="color: white" target="_blank"
+       rel="noopener noreferrer">
+        <img alt="release" src="https://img.shields.io/github/v/release/LeoHaoVIP/AListLiteAndroid"/>
+    </a>
+    <img alt="platform" src="https://img.shields.io/badge/platform-android-f079f4.svg"/>
+    <img alt="language" src="https://img.shields.io/badge/language-java|go-green.svg"/>
+</p>
+<p align="center">
+    <a href="release-log.html" style="color: white" target="_blank"
+       rel="noopener noreferrer">
+        <img src="https://img.shields.io/badge/更新日志-33ffff.svg"/>
+    </a>
+    <a href="https://doc.oplist.org.cn/guide/drivers/common" style="color: white" target="_blank"
+       rel="noopener noreferrer">
+        <img src="https://img.shields.io/badge/挂载教程-338888.svg"/>
+    </a>
+    <a href="https://github.com/LeoHaoVIP/AListLiteAndroid/issues" style="color: white" target="_blank"
+       rel="noopener noreferrer">
+        <img src="https://img.shields.io/badge/问题反馈-00ccff.svg"/>
+    </a>
+    <a href="mailto:zhaowenhao2867@outlook.com" style="color: white" target="_blank"
+       rel="noopener noreferrer">
+        <img src="https://img.shields.io/badge/联系开发者-339966.svg"/>
+    </a>
+    <a href="reward.html" style="color: white" target="_blank"
+       rel="noopener noreferrer">
+        <img src="https://img.shields.io/badge/项目捐助-ffcc99.svg"/>
+    </a>
+</p>
+<p align="center"><strong>项目贡献者</strong></p>
+<div align="center" id="contributors">☻ 加载中...</div>
+<p align="center" id="text_version" style="font-size: 13px">AListLite | Powered by OpenList</p>
+</body>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const owner = 'LeoHaoVIP';
+        const repo = 'AListLiteAndroid';
+        const contributorsDiv = document.getElementById('contributors');
+        fetch(`https://api.github.com/repos/${owner}/${repo}/contributors`)
+            .then(response => response.json())
+            .then(contributors => {
+                contributorsDiv.innerText = '';
+                contributors.forEach(contributor => {
+                    const contributorDiv = document.createElement('div');
+                    contributorDiv.className = 'contributor';
+                    const img = document.createElement('img');
+                    img.src = contributor.avatar_url;
+                    img.alt = `${contributor.login}'s avatar`;
+                    img.className = 'avatar';
+                    const a = document.createElement('a');
+                    a.href = contributor.html_url
+                    a.target = "_blank"
+                    a.appendChild(img)
+                    contributorDiv.appendChild(a);
+                    contributorsDiv.appendChild(contributorDiv);
+                });
+            }).catch(error => {
+            contributorsDiv.innerText = '😢 贡献者列表加载失败';
+            console.error('Error fetching contributors:', error);
+        });
+    });
+</script>
+</html>
