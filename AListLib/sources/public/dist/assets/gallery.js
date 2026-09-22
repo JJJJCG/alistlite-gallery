@@ -1729,6 +1729,8 @@ function uiConfirm(msg) {
 
 function openAdmin() {
   $('#admin').hidden = false;
+  // 打开面板就初始化表单：stAdd 为 null 时直接保存会崩（之前「无法保存挂载」的原因）
+  if (!stAdd) onDriverChange();
   refreshStorages();
 }
 
@@ -1853,8 +1855,18 @@ function onDriverChange() {
 }
 
 function saveStorage() {
+  // 整体兜底：任何异常都以 toast 呈现，绝不再静默失败
+  try {
+    doSaveStorage();
+  } catch (e) {
+    toast('保存出错：' + e.message, 6000);
+  }
+}
+
+function doSaveStorage() {
   var driver = $('#stDriver').value;
   var mount = ($('#stMount').value.trim() || '/');
+  if (!stAdd) stAdd = Object.assign({}, DRIVER_TEMPLATE[driver] || {});
   // 组装 addition：默认以友好输入框为准；若用户手动改过「高级」JSON，则以 JSON 为准
   var add;
   if (stAdvancedDirty) {
@@ -1909,7 +1921,12 @@ function saveStorage() {
         msg = '挂载路径「' + mount + '」已经存在 —— 每个挂载的路径必须唯一。' +
               '如果想改它的根目录，请在上方列表里点「编辑」，不要新增。';
       }
-      toast('保存失败：' + msg, 7000);
+      var nf = msg.match(/root folder (.+?) not exists/);
+      if (nf) {
+        msg = '目录 ' + nf[1] + ' 在这台设备上不存在，请检查拼写（内置存储一般是 /storage/emulated/0 开头）。' +
+              '注意：这条挂载已写入下方列表（状态为错误），点列表里的「编辑」把目录改对即可。';
+      }
+      toast('保存失败：' + msg, 9000);
     });
   }
 
@@ -1921,8 +1938,11 @@ function saveStorage() {
     var dup = null;
     list.forEach(function (s) { if ((s.mount_path || '/') === mount) dup = s; });
     if (dup) {
-      toast('挂载路径「' + mount + '」已经存在（' + (dup.driver || '?') + '）。' +
-            '要改它的根目录，请在上方列表点「编辑」。', 7000);
+      // 后端创建存储是「先写库、再初始化」：目录不存在时会留下一条 status=error 的记录并占住路径
+      var hint = dup.status === 'error'
+        ? '之前创建过这个挂载，但初始化失败（多半是「要挂载的目录」不存在或拼错了）。请在上方列表点「编辑」把目录改对。'
+        : '挂载路径「' + mount + '」已经存在（' + (dup.driver || '?') + '）。要改它的根目录，请在上方列表点「编辑」。';
+      toast(hint, 7000);
       return null;
     }
     submit();
